@@ -59,8 +59,46 @@ def mark_topic_used(channel_id: str, topic: str) -> None:
     _used_topics_path(channel_id).write_text(json.dumps(sorted(used)))
 
 
+def _generate_more_topics(config: dict, existing: list, count: int = 20) -> list:
+    """Asks Gemini for a fresh batch of topic ideas for this channel's niche,
+    avoiding anything already in `existing`. Returns [] on any failure so the
+    caller can fall back to looping the existing list instead of crashing."""
+    if not (GEMINI_AVAILABLE and os.environ.get("GEMINI_API_KEY")):
+        return []
+    try:
+        client = genai_client.Client(api_key=os.environ["GEMINI_API_KEY"])
+        existing_sample = "\n".join(f"- {t}" for t in existing[-40:])
+        prompt = f"""You generate topic ideas for a faceless YouTube channel.
+
+Channel: {config['display_name']}
+Niche: {config['niche']}
+Tone: {config['tone']}
+
+Here are topics already covered (do NOT repeat these or close variations):
+{existing_sample}
+
+Generate {count} brand new topic ideas for this channel, each a single line,
+each specific enough to script a short video from (not a vague category).
+No numbering, no markdown, no quotes — just one topic per line."""
+
+        response = client.models.generate_content(model=GEMINI_MODEL, contents=prompt)
+        lines = [
+            re.sub(r"^[\d\.\-\)\s]+", "", line).strip()
+            for line in response.text.splitlines()
+        ]
+        new_topics = [line for line in lines if line and line not in existing]
+        return new_topics
+    except Exception as e:
+        print(f"WARNING: topic auto-generation failed ({e}); will loop existing topics instead.")
+        return []
+
+
 def pick_next_topic(channel_id: str, config: dict) -> str:
-    """Pick an unused topic from the seed file. Loops back if exhausted."""
+    """Pick an unused topic from the seed file. If the seed file is
+    exhausted, try to generate a fresh batch of topics via Gemini and append
+    them to the seed file (so the channel keeps expanding its topic pool
+    instead of quietly repeating content). Only loops back to reused topics
+    as a last resort, if topic generation isn't available."""
     topics_file = ROOT / config["topics_seed_file"]
     all_topics = [
         line.strip() for line in topics_file.read_text().splitlines() if line.strip()
@@ -69,10 +107,17 @@ def pick_next_topic(channel_id: str, config: dict) -> str:
     unused = [t for t in all_topics if t not in used]
 
     if not unused:
-        # Exhausted the seed list — reset so it loops rather than crashing.
-        # NOTE: you should add more topics to the seed file periodically
-        # so content doesn't repeat. See README "Keeping topics fresh".
-        unused = all_topics
+        new_topics = _generate_more_topics(config, all_topics)
+        if new_topics:
+            with topics_file.open("a") as f:
+                f.write("\n" + "\n".join(new_topics) + "\n")
+            print(f"Added {len(new_topics)} new topics to {topics_file.name}")
+            unused = new_topics
+        else:
+            # No API key / generation failed — reset so it loops rather than
+            # crashing. You should add more topics to the seed file
+            # periodically in this case. See README "Keeping topics fresh".
+            unused = all_topics
 
     topic = random.choice(unused)
     mark_topic_used(channel_id, topic)
