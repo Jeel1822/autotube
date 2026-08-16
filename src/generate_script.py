@@ -31,6 +31,20 @@ except ImportError:
 
 GEMINI_MODEL = "gemini-3.5-flash-lite"
 
+# Roughly 1.5 tokens/word for English is a safe over-estimate; Hindi
+# (Devanagari) tokenizes less efficiently per word, so pad generously.
+# Without an explicit max_output_tokens, the SDK's default cap can silently
+# truncate long-form scripts mid-sentence (observed: an 8-minute/1200-word
+# target coming back as a ~365-word/2:26 script) — always request enough
+# headroom for the target length plus the title line and some safety margin.
+TOKENS_PER_WORD = 2.2
+MIN_OUTPUT_TOKENS = 512
+TOKEN_SAFETY_MARGIN = 200
+
+
+def _max_output_tokens_for(words_target: int) -> int:
+    return max(MIN_OUTPUT_TOKENS, int(words_target * TOKENS_PER_WORD) + TOKEN_SAFETY_MARGIN)
+
 LANGUAGE_NAMES = {
     "en": "English",
     "hi": "Hindi (written in Devanagari script, not transliterated/Roman Hindi)",
@@ -86,7 +100,7 @@ Generate {count} brand new topic ideas for this channel, each a single line,
 each specific enough to script a short video from (not a vague category).
 No numbering, no markdown, no quotes — just one topic per line."""
 
-        response = client.models.generate_content(model=GEMINI_MODEL, contents=prompt)
+        response = _generate_with_token_budget(client, prompt, max_output_tokens=800)
         lines = [
             re.sub(r"^[\d\.\-\)\s]+", "", line).strip()
             for line in response.text.splitlines()
@@ -193,8 +207,37 @@ phrases like "in conclusion" or "subscribe for more" — end naturally on
 the content itself. Write in plain, conversational {language_name}
 suitable for text-to-speech."""
 
-    response = client.models.generate_content(model=GEMINI_MODEL, contents=prompt)
+    max_tokens = _max_output_tokens_for(words_target)
+    response = _generate_with_token_budget(client, prompt, max_tokens)
     return _parse_titled_response(response.text, fallback_topic=topic)
+
+
+def _generate_with_token_budget(client, prompt: str, max_output_tokens: int):
+    """Calls generate_content with an explicit max_output_tokens (falling
+    back to no config if this SDK version's config shape differs, so a
+    google-genai version mismatch doesn't hard-crash the run), and warns
+    loudly if the response still got cut off mid-generation."""
+    try:
+        from google.genai import types
+        config = types.GenerateContentConfig(max_output_tokens=max_output_tokens)
+        response = client.models.generate_content(
+            model=GEMINI_MODEL, contents=prompt, config=config,
+        )
+    except Exception as e:
+        print(f"WARNING: could not apply max_output_tokens config ({e}); "
+              f"calling without it.")
+        response = client.models.generate_content(model=GEMINI_MODEL, contents=prompt)
+
+    finish_reason = None
+    try:
+        finish_reason = response.candidates[0].finish_reason
+    except Exception:
+        pass
+    if finish_reason and "MAX_TOKENS" in str(finish_reason).upper():
+        print(f"WARNING: Gemini response was truncated by max_output_tokens="
+              f"{max_output_tokens}. The generated script will be shorter "
+              f"than the target length. Consider raising TOKENS_PER_WORD.")
+    return response
 
 
 def _parse_titled_response(text: str, fallback_topic: str) -> dict:
