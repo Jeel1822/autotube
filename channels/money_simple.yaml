@@ -5,6 +5,10 @@ tone: "clear, practical, no jargon — like a smart friend explaining money"
 video_length_seconds: 480
 short_length_seconds: 45
 voice: "en-US-JennyNeural"
+languages: ["en", "hi"]
+voices:
+  en: "en-US-JennyNeural"
+  hi: "hi-IN-SwaraNeural"
 topics_seed_file: "channels/money_simple_topics.txt"
 upload_time_utc: "15:00"
 shorts_upload_times_utc: ["08:00", "11:30", "14:30", "17:30", "20:30"]

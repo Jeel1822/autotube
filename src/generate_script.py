@@ -31,6 +31,11 @@ except ImportError:
 
 GEMINI_MODEL = "gemini-3.5-flash-lite"
 
+LANGUAGE_NAMES = {
+    "en": "English",
+    "hi": "Hindi (written in Devanagari script, not transliterated/Roman Hindi)",
+}
+
 ROOT = Path(__file__).resolve().parent.parent
 STATE_DIR = ROOT / "state"
 STATE_DIR.mkdir(exist_ok=True)
@@ -124,6 +129,30 @@ def pick_next_topic(channel_id: str, config: dict) -> str:
     return topic
 
 
+def pick_language(config: dict) -> str:
+    """Randomly picks a language for this run from the channel's configured
+    `languages` list, so consecutive uploads aren't predictably alternating
+    (e.g. not strict en/hi/en/hi) but genuinely random each time. Channels
+    that don't set `languages` in their yaml stay English-only, unchanged
+    from before."""
+    languages = config.get("languages") or ["en"]
+    return random.choice(languages)
+
+
+def _voice_for_language(config: dict, language: str) -> str:
+    """Resolves the TTS voice for a given language, falling back to the
+    legacy single `voice` key for channels that haven't been migrated to
+    the `voices: {en: ..., hi: ...}` map yet."""
+    voices = config.get("voices") or {}
+    voice = voices.get(language) or config.get("voice")
+    if not voice:
+        raise ValueError(
+            f"No TTS voice configured for language '{language}' in this "
+            f"channel's yaml (add it under 'voices:')."
+        )
+    return voice
+
+
 def _clean_script_text(text: str) -> str:
     """Strip markdown, stage directions, and anything not meant to be spoken."""
     text = re.sub(r"\*+", "", text)
@@ -133,10 +162,11 @@ def _clean_script_text(text: str) -> str:
     return text.strip()
 
 
-def generate_with_gemini(topic: str, config: dict, length_seconds: int) -> str:
+def generate_with_gemini(topic: str, config: dict, length_seconds: int, language: str) -> dict:
     client = genai_client.Client(api_key=os.environ["GEMINI_API_KEY"])
 
     words_target = int(length_seconds * 2.5)  # ~150 wpm speaking pace
+    language_name = LANGUAGE_NAMES.get(language, language)
 
     prompt = f"""You are writing a voiceover script for a faceless YouTube video.
 
@@ -144,56 +174,89 @@ Channel: {config['display_name']}
 Niche: {config['niche']}
 Tone: {config['tone']}
 Topic: {topic}
+Language: {language_name}
 
-Write ONLY the spoken narration, nothing else — no titles, no stage directions,
-no [visual cues], no markdown. Just the words a narrator would read aloud.
+Respond in EXACTLY this format and nothing else — no markdown, no extra commentary:
 
-Target length: approximately {words_target} words (this fills about
+TITLE: <a punchy YouTube title in {language_name}, under 90 characters>
+SCRIPT:
+<the spoken narration only, in {language_name} — no titles, no stage
+directions, no [visual cues], no markdown, just the words a narrator
+would read aloud>
+
+Target script length: approximately {words_target} words (about
 {length_seconds} seconds at natural speaking pace).
 
 Structure: strong hook in the first sentence, build curiosity, deliver the
 core facts/insight clearly, end with a punchy closing line. Do not use
 phrases like "in conclusion" or "subscribe for more" — end naturally on
-the content itself.
-
-Write in plain, conversational English suitable for text-to-speech."""
+the content itself. Write in plain, conversational {language_name}
+suitable for text-to-speech."""
 
     response = client.models.generate_content(model=GEMINI_MODEL, contents=prompt)
-    return _clean_script_text(response.text)
+    return _parse_titled_response(response.text, fallback_topic=topic)
 
 
-def generate_with_template(topic: str, config: dict) -> str:
+def _parse_titled_response(text: str, fallback_topic: str) -> dict:
+    """Parses the 'TITLE: ...\\nSCRIPT:\\n...' format out of a Gemini
+    response. Falls back to using the topic as the title and the whole
+    response as the script if the model didn't follow the format exactly,
+    so a formatting slip never crashes the run."""
+    title_match = re.search(r"TITLE:\s*(.+)", text)
+    script_match = re.search(r"SCRIPT:\s*(.*)", text, re.DOTALL)
+
+    title = title_match.group(1).strip() if title_match else fallback_topic
+    script_raw = script_match.group(1).strip() if script_match else text
+    return {"title": title, "script": _clean_script_text(script_raw)}
+
+
+def generate_with_template(topic: str, config: dict, language: str) -> dict:
     """Zero-dependency fallback so the pipeline works with no API key at all."""
-    return (
-        f"Here's something most people don't know: {topic}. "
-        f"It sounds simple, but the reasons behind it reveal a lot about "
-        f"{config['niche'].lower()}. Once you understand why this happens, "
-        f"you'll start noticing it everywhere in your own life. "
-        f"That's the kind of small insight that changes how you see the world."
-    )
+    if language == "hi":
+        script = (
+            f"ज़्यादातर लोग नहीं जानते: {topic}. यह सुनने में आसान लगता है, "
+            f"लेकिन इसके पीछे की वजह {config['niche']} के बारे में बहुत कुछ बताती है। "
+            f"एक बार जब आप यह समझ जाएंगे, तो आप इसे अपनी ज़िंदगी में हर जगह "
+            f"देखने लगेंगे। यही वो छोटी सी बात है जो आपके देखने का नज़रिया बदल देती है।"
+        )
+        title = topic
+    else:
+        script = (
+            f"Here's something most people don't know: {topic}. "
+            f"It sounds simple, but the reasons behind it reveal a lot about "
+            f"{config['niche'].lower()}. Once you understand why this happens, "
+            f"you'll start noticing it everywhere in your own life. "
+            f"That's the kind of small insight that changes how you see the world."
+        )
+        title = topic[0].upper() + topic[1:] if topic else topic
+    return {"title": title, "script": script}
 
 
 def generate_script(channel_id: str, is_short: bool = False) -> dict:
     config = load_channel_config(channel_id)
     topic = pick_next_topic(channel_id, config)
+    language = pick_language(config)
     length = config["short_length_seconds"] if is_short else config["video_length_seconds"]
 
     if GEMINI_AVAILABLE and os.environ.get("GEMINI_API_KEY"):
         try:
-            script_text = generate_with_gemini(topic, config, length)
+            generated = generate_with_gemini(topic, config, length, language)
         except Exception as e:
             # Don't let a Gemini outage/model-rename/quota issue kill the
             # whole daily run — fall back to the template so a video still
             # gets made, and print the error so it's visible in CI logs.
             print(f"WARNING: Gemini call failed ({e}); using template fallback.")
-            script_text = generate_with_template(topic, config)
+            generated = generate_with_template(topic, config, language)
     else:
-        script_text = generate_with_template(topic, config)
+        generated = generate_with_template(topic, config, language)
 
     return {
         "channel_id": channel_id,
         "topic": topic,
-        "script": script_text,
+        "title": generated["title"],
+        "script": generated["script"],
+        "language": language,
+        "voice": _voice_for_language(config, language),
         "is_short": is_short,
     }
 

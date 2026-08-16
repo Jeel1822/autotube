@@ -31,10 +31,10 @@ def load_channel_config(channel_id: str) -> dict:
         return yaml.safe_load(f)
 
 
-def make_title(topic: str, is_short: bool) -> str:
-    title = topic[0].upper() + topic[1:]
-    if is_short and not title.endswith("!") and not title.endswith("?"):
-        title = title.rstrip(".") 
+def make_title(title: str, is_short: bool) -> str:
+    title = title.strip()
+    if title and is_short and not title.endswith("!") and not title.endswith("?"):
+        title = title.rstrip(".")
     return title[:95] + (" #Shorts" if is_short else "")
 
 
@@ -49,16 +49,20 @@ def run(channel_id: str, is_short: bool, privacy_status: str = "public",
         # 1. Script
         result = generate_script(channel_id, is_short=is_short)
         topic, script_text = result["topic"], result["script"]
+        language, voice = result["language"], result["voice"]
         print(f"Topic: {topic}")
+        print(f"Language: {language} | Voice: {voice}")
         print(f"Script ({len(script_text.split())} words):\n{script_text}\n")
 
         # 2. TTS
         audio_path = tmp / "audio.mp3"
         timing_path = tmp / "timing.json"
-        synthesize_speech(script_text, config["voice"], str(audio_path), str(timing_path))
+        synthesize_speech(script_text, voice, str(audio_path), str(timing_path))
         print(f"Audio generated: {audio_path}")
 
-        # 3. Stock footage
+        # 3. Stock footage — search query stays in English (topic is always
+        # the internal English working title, regardless of script language)
+        # since stock footage libraries index best in English anyway.
         clip_count = 3 if is_short else 8
         clips_dir = tmp / "clips"
         clip_paths = fetch_clips_for_topic(
@@ -82,7 +86,7 @@ def run(channel_id: str, is_short: bool, privacy_status: str = "public",
             return
 
         # 5. Upload
-        title = make_title(topic, is_short)
+        title = make_title(result["title"], is_short)
         description = f"{script_text[:400]}...\n\n{' '.join('#' + t.replace(' ', '') for t in config['tags'][:5])}"
         token_path = ROOT / "tokens" / f"{channel_id}_token.pickle"
 
