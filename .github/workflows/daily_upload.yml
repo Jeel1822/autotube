@@ -1,0 +1,87 @@
+name: Daily Upload Pipeline
+
+on:
+  schedule:
+    # Fires every hour. src/scheduler.py checks each channel's config and
+    # only runs uploads that are actually due at the current UTC hour —
+    # so the real output stays at exactly 1 long-form + 5 shorts per
+    # channel per day, spread across the day, no matter how often this
+    # cron ticks.
+    - cron: "0 * * * *"
+  workflow_dispatch:
+    inputs:
+      channel:
+        description: "Run a single channel manually (leave blank for scheduler)"
+        required: false
+      short:
+        description: "Make it a short?"
+        type: boolean
+        default: false
+      dry_run:
+        description: "Dry run (build video, skip upload)?"
+        type: boolean
+        default: false
+
+jobs:
+  run_pipeline:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install ffmpeg
+        run: sudo apt-get update && sudo apt-get install -y ffmpeg
+
+      - name: Install Python dependencies
+        run: pip install -r requirements.txt
+
+      - name: Restore pipeline state (avoids repeating topics)
+        uses: actions/cache@v4
+        with:
+          path: state
+          key: pipeline-state-${{ github.run_id }}
+          restore-keys: pipeline-state-
+
+      - name: Restore YouTube token (Mind Bites only, for now)
+        env:
+          TOKEN_MIND_BITES: ${{ secrets.YOUTUBE_TOKEN_MIND_BITES }}
+        run: |
+          mkdir -p tokens
+          echo "$TOKEN_MIND_BITES" | base64 -d > tokens/mind_bites_token.pickle
+
+      # Manual single-channel run (for testing via "Run workflow" button)
+      - name: Manual run
+        if: github.event_name == 'workflow_dispatch' && inputs.channel != ''
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
+        run: |
+          python src/main.py "${{ inputs.channel }}" \
+            ${{ inputs.short == 'true' && '--short' || '' }} \
+            ${{ inputs.dry_run == 'true' && '--dry-run' || '' }}
+
+      # Normal scheduled run — the scheduler decides what's due.
+      # ENABLED_CHANNELS restricts this to Mind Bites only, since the
+      # other 2 channels don't have YouTube tokens set up yet. Once you
+      # add YOUTUBE_TOKEN_THEN_AND_NOW / YOUTUBE_TOKEN_MONEY_SIMPLE
+      # secrets and restore them above, add those channel_ids here too
+      # (or delete the ENABLED_CHANNELS line entirely to run all of them).
+      - name: Scheduled run
+        if: github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.channel == '')
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
+          ENABLED_CHANNELS: "mind_bites"
+        run: |
+          python src/scheduler.py
+
+      - name: Save pipeline state
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: state
+          key: pipeline-state-${{ github.run_id }}

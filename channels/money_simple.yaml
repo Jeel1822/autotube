@@ -1,0 +1,17 @@
+channel_id: money_simple
+display_name: "Money Simple"
+niche: "Personal finance explained simply"
+tone: "clear, practical, no jargon — like a smart friend explaining money"
+video_length_seconds: 480
+short_length_seconds: 45
+voice: "en-US-JennyNeural"
+topics_seed_file: "channels/money_simple_topics.txt"
+upload_time_utc: "15:00"
+shorts_upload_times_utc: ["08:00", "11:30", "14:30", "17:30", "20:30"]
+tags: ["personal finance", "money tips", "saving money", "investing for beginners"]
+category_id: "27"
+
+# IMPORTANT: finance content is more heavily scrutinized by YouTube (YMYL policy)
+# and prone to demonetization/removal if it strays into "financial advice."
+# Keep scripts strictly educational/general, never "buy this stock" style.
+disclaimer_required: true
