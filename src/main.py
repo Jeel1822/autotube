@@ -21,6 +21,7 @@ from generate_script import generate_script
 from tts import synthesize_speech
 from fetch_stock import fetch_clips_for_topic
 from assemble_video import assemble_video
+from generate_thumbnail import generate_thumbnail
 from upload_youtube import upload_video
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -85,7 +86,14 @@ def run(channel_id: str, is_short: bool, privacy_status: str = "public",
             print(f"[DRY RUN] Saved to {dest} instead of uploading")
             return
 
-        # 5. Upload
+        # 5. Thumbnail — best-effort; a failure here never blocks the upload
+        thumb_path = tmp / "thumbnail.jpg"
+        thumbnail_result = generate_thumbnail(
+            str(output_path), result["title"], str(thumb_path),
+            language=language, portrait=is_short,
+        )
+
+        # 6. Upload
         title = make_title(result["title"], is_short)
         description = f"{script_text[:400]}...\n\n{' '.join('#' + t.replace(' ', '') for t in config['tags'][:5])}"
         token_path = ROOT / "tokens" / f"{channel_id}_token.pickle"
@@ -94,6 +102,7 @@ def run(channel_id: str, is_short: bool, privacy_status: str = "public",
             str(output_path), title, description, config["tags"],
             config["category_id"], str(token_path),
             privacy_status=privacy_status, is_short=is_short,
+            thumbnail_path=thumbnail_result,
         )
         print(f"Uploaded: https://youtube.com/watch?v={video_id}")
 

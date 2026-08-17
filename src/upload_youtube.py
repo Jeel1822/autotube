@@ -62,6 +62,7 @@ def upload_video(
     client_secret_path: str = None,
     privacy_status: str = "public",
     is_short: bool = False,
+    thumbnail_path: str = None,
 ) -> str:
     """Returns the uploaded video's YouTube ID."""
     youtube = get_authenticated_service(token_path, client_secret_path)
@@ -93,7 +94,26 @@ def upload_video(
         if status:
             print(f"Upload progress: {int(status.progress() * 100)}%")
 
-    return response["id"]
+    video_id = response["id"]
+
+    if thumbnail_path:
+        try:
+            youtube.thumbnails().set(
+                videoId=video_id,
+                media_body=MediaFileUpload(thumbnail_path, mimetype="image/jpeg"),
+            ).execute()
+            print(f"Custom thumbnail set for {video_id}")
+        except Exception as e:
+            # A thumbnail failure should never take down an otherwise-
+            # successful upload. Common cause: the channel isn't phone-
+            # verified yet -- custom thumbnails require verification
+            # (https://www.youtube.com/verify). The video itself is fine;
+            # YouTube just falls back to an auto-picked frame.
+            print(f"WARNING: could not set custom thumbnail ({e}). "
+                  f"Video uploaded fine, just without a custom thumbnail. "
+                  f"If your channel isn't phone-verified, that's the likely cause.")
+
+    return video_id
 
 
 if __name__ == "__main__":

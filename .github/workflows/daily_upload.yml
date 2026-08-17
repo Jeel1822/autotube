@@ -33,8 +33,14 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: Install ffmpeg
-        run: sudo apt-get update && sudo apt-get install -y ffmpeg
+      - name: Install ffmpeg and fonts
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg fonts-freefont-ttf
+          # fonts-freefont-ttf provides FreeSans, which has verified correct
+          # Devanagari shaping via libass/HarfBuzz (used for Hindi captions
+          # and thumbnails). Without this installed, Hindi text can render
+          # with missing vowel signs and no word spacing.
 
       - name: Install Python dependencies
         run: pip install -r requirements.txt

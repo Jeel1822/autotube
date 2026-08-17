@@ -22,17 +22,6 @@ def _get_audio_duration(audio_path: str) -> float:
     return float(out.stdout.strip())
 
 
-def _escape_drawtext(text: str) -> str:
-    """Escape characters that are special to ffmpeg's drawtext filter syntax."""
-    text = text.replace("\\", "\\\\\\\\")
-    text = text.replace(":", "\\:")
-    text = text.replace("'", "\u2019")   # straight quote -> curly, avoids escaping headaches
-    text = text.replace("%", "\\%")
-    text = text.replace(",", "\\,")
-    text = text.replace("[", "\\[").replace("]", "\\]")
-    return text
-
-
 def _build_caption_chunks(timing_path: str, words_per_caption: int = 4) -> list:
     """Groups word-level timings into short caption chunks: [(start, end, text), ...]"""
     words = json.loads(Path(timing_path).read_text())
@@ -44,6 +33,51 @@ def _build_caption_chunks(timing_path: str, words_per_caption: int = 4) -> list:
         text = " ".join(w["text"] for w in chunk)
         chunks.append((start, end, text))
     return chunks
+
+
+def _ass_timestamp(seconds: float) -> str:
+    """Format seconds as an .ass timestamp: H:MM:SS.CC"""
+    if seconds < 0:
+        seconds = 0.0
+    h = int(seconds // 3600)
+    m = int((seconds % 3600) // 60)
+    s = seconds % 60
+    return f"{h:d}:{m:02d}:{s:05.2f}"
+
+
+def _escape_ass_text(text: str) -> str:
+    """Escape characters with special meaning inside an .ass Dialogue text field."""
+    return text.replace("\\", "\\\\").replace("{", "\\{").replace("}", "\\}")
+
+
+def _write_ass_subtitles(chunks: list, ass_path: Path, width: int, height: int,
+                          font_size: int, portrait: bool) -> None:
+    """Writes all caption chunks into a single .ass file (one subtitle track,
+    burned in later with a single `subtitles=` filter instead of N chained
+    drawtext filters -- this is what keeps ffmpeg fast on long videos)."""
+    margin_v = int(font_size * 3.2)
+    header = f"""[Script Info]
+ScriptType: v4.00+
+PlayResX: {width}
+PlayResY: {height}
+WrapStyle: 2
+ScaledBorderAndShadow: yes
+
+[V4+ Styles]
+Format: Name, Fontname, Fontsize, PrimaryColour, OutlineColour, BackColour, Bold, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
+Style: Default,FreeSans,{font_size},&H00FFFFFF,&H00000000,&H99000000,1,3,2,0,2,40,40,{margin_v},1
+
+[Events]
+Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
+"""
+    lines = [header]
+    for start, end, text in chunks:
+        escaped = _escape_ass_text(text)
+        lines.append(
+            f"Dialogue: 0,{_ass_timestamp(start)},{_ass_timestamp(end)},"
+            f"Default,,0,0,0,,{escaped}\n"
+        )
+    ass_path.write_text("".join(lines), encoding="utf-8")
 
 
 def assemble_video(
@@ -81,28 +115,24 @@ def assemble_video(
             "-c", "copy", str(background),
         ], check=True, capture_output=True)
 
-        # 3. Build caption chunks (word-timed groups of ~4 words)
+        # 3. Build caption chunks (word-timed groups of ~4 words) and write
+        # them all into a single .ass subtitle file. Burning captions in via
+        # one `subtitles=` filter (needs libass, which ships with ffmpeg's
+        # standard build) is dramatically faster than chaining one drawtext
+        # filter per caption -- ffmpeg was re-evaluating a 250+ filter graph
+        # on every frame before, which is what caused the multi-minute hangs
+        # on longer videos.
         chunks = _build_caption_chunks(timing_path)
-
-        # 4. Merge background + voiceover audio + burned captions via drawtext.
-        # drawtext ships with every ffmpeg build (unlike the subtitles filter,
-        # which needs libass) so this works with no extra dependencies.
         font_size = 56 if portrait else 44
-        y_pos = f"h-{int(font_size * 3.2)}"  # near bottom, matches old subtitle position
 
+        vf_chain = None
         if chunks:
-            drawtext_filters = []
-            for start, end, text in chunks:
-                escaped = _escape_drawtext(text)
-                drawtext_filters.append(
-                    f"drawtext=text='{escaped}':fontsize={font_size}:fontcolor=white:"
-                    f"box=1:boxcolor=black@0.6:boxborderw=10:"
-                    f"x=(w-text_w)/2:y={y_pos}:"
-                    f"enable='between(t,{start:.3f},{end:.3f})'"
-                )
-            vf_chain = ",".join(drawtext_filters)
-        else:
-            vf_chain = None
+            ass_path = tmp / "captions.ass"
+            _write_ass_subtitles(chunks, ass_path, width, height, font_size, portrait)
+            # ffmpeg filter args need colons/backslashes escaped when the path
+            # is passed as a filter option value.
+            escaped_ass_path = str(ass_path).replace("\\", "\\\\").replace(":", "\\:")
+            vf_chain = f"subtitles='{escaped_ass_path}'"
 
         Path(output_path).parent.mkdir(parents=True, exist_ok=True)
         cmd = ["ffmpeg", "-y", "-i", str(background), "-i", audio_path]
