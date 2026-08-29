@@ -17,11 +17,13 @@ from pathlib import Path
 
 import yaml
 
-from generate_script import generate_script
+from generate_script import generate_script, generate_kids_script
 from tts import synthesize_speech
 from fetch_stock import fetch_clips_for_topic
 from assemble_video import assemble_video
 from generate_thumbnail import generate_thumbnail
+from generate_kids_video import generate_kids_video
+from generate_mascot_assets import generate_mascot_assets
 from upload_youtube import upload_video
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -42,16 +44,22 @@ def make_title(title: str, is_short: bool) -> str:
 def run(channel_id: str, is_short: bool, privacy_status: str = "public",
         dry_run: bool = False) -> None:
     config = load_channel_config(channel_id)
+    is_kids_channel = config.get("visual_style") == "puppet_animation"
     print(f"=== Running {config['display_name']} | {'SHORT' if is_short else 'LONG-FORM'} ===")
 
     with tempfile.TemporaryDirectory() as tmp:
         tmp = Path(tmp)
 
         # 1. Script
-        result = generate_script(channel_id, is_short=is_short)
+        if is_kids_channel:
+            result = generate_kids_script(channel_id, is_short=is_short)
+        else:
+            result = generate_script(channel_id, is_short=is_short)
         topic, script_text = result["topic"], result["script"]
         language, voice = result["language"], result["voice"]
         print(f"Topic: {topic}")
+        if is_kids_channel:
+            print(f"Content type: {result['content_type']} | Mascot: {result['mascot_name']}")
         print(f"Language: {language} | Voice: {voice}")
         print(f"Script ({len(script_text.split())} words):\n{script_text}\n")
 
@@ -61,21 +69,29 @@ def run(channel_id: str, is_short: bool, privacy_status: str = "public",
         synthesize_speech(script_text, voice, str(audio_path), str(timing_path))
         print(f"Audio generated: {audio_path}")
 
-        # 3. Stock footage — search query stays in English (topic is always
-        # the internal English working title, regardless of script language)
-        # since stock footage libraries index best in English anyway.
-        clip_count = 3 if is_short else 8
-        clips_dir = tmp / "clips"
-        clip_paths = fetch_clips_for_topic(
-            topic, str(clips_dir), count=clip_count,
-            orientation="portrait" if is_short else "landscape",
-        )
-        print(f"Downloaded {len(clip_paths)} clips")
-
-        # 4. Assemble
+        # 3+4. Visuals + assembly — kids channel uses the puppet-animation
+        # pipeline (mascot + lip-synced mouth), everything else uses stock
+        # footage + captions.
         output_path = tmp / "final.mp4"
-        assemble_video(clip_paths, str(audio_path), str(timing_path),
-                        str(output_path), portrait=is_short)
+        if is_kids_channel:
+            mascot_dir = tmp / "mascot_assets"
+            frame_paths = generate_mascot_assets(result["mascot"], str(mascot_dir))
+            print(f"Mascot assets ready: {frame_paths}")
+            generate_kids_video(str(audio_path), str(timing_path), frame_paths,
+                                 str(output_path), portrait=is_short)
+        else:
+            # Stock footage search query stays in English (topic is always
+            # the internal English working title, regardless of script
+            # language) since stock footage libraries index best in English.
+            clip_count = 3 if is_short else 8
+            clips_dir = tmp / "clips"
+            clip_paths = fetch_clips_for_topic(
+                topic, str(clips_dir), count=clip_count,
+                orientation="portrait" if is_short else "landscape",
+            )
+            print(f"Downloaded {len(clip_paths)} clips")
+            assemble_video(clip_paths, str(audio_path), str(timing_path),
+                            str(output_path), portrait=is_short)
         print(f"Assembled video: {output_path} ({output_path.stat().st_size / 1e6:.1f} MB)")
 
         if dry_run:
@@ -103,6 +119,7 @@ def run(channel_id: str, is_short: bool, privacy_status: str = "public",
             config["category_id"], str(token_path),
             privacy_status=privacy_status, is_short=is_short,
             thumbnail_path=thumbnail_result,
+            made_for_kids=config.get("made_for_kids", False),
         )
         print(f"Uploaded: https://youtube.com/watch?v={video_id}")
 

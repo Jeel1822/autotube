@@ -36,11 +36,14 @@ jobs:
       - name: Install ffmpeg and fonts
         run: |
           sudo apt-get update
-          sudo apt-get install -y ffmpeg fonts-freefont-ttf
+          sudo apt-get install -y ffmpeg fonts-freefont-ttf librsvg2-bin
           # fonts-freefont-ttf provides FreeSans, which has verified correct
           # Devanagari shaping via libass/HarfBuzz (used for Hindi captions
           # and thumbnails). Without this installed, Hindi text can render
           # with missing vowel signs and no word spacing.
+          # librsvg2-bin provides rsvg-convert, used by
+          # generate_mascot_assets.py to render the Jungle Ke Dost mascot
+          # SVGs to PNG for the puppet-animation pipeline.
 
       - name: Install Python dependencies
         run: pip install -r requirements.txt
@@ -58,6 +61,15 @@ jobs:
         run: |
           mkdir -p tokens
           echo "$TOKEN_MIND_BITES" | base64 -d > tokens/mind_bites_token.pickle
+          # Once Jungle Ke Dost has its own YouTube channel + OAuth token:
+          # 1. Add a YOUTUBE_TOKEN_JUNGLE_KE_DOST repo secret (same process
+          #    as Mind Bites — see README "YouTube API setup").
+          # 2. Add a line here:
+          #    echo "$TOKEN_JUNGLE_KE_DOST" | base64 -d > tokens/jungle_ke_dost_token.pickle
+          #    (and add TOKEN_JUNGLE_KE_DOST to this step's env: above)
+          # 3. Add "jungle_ke_dost" to ENABLED_CHANNELS below.
+          # Skipping any of these 3 steps means its scheduled uploads will
+          # fail with a missing-token error, not silently do nothing.
 
       # Manual single-channel run (for testing via "Run workflow" button)
       - name: Manual run

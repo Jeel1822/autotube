@@ -63,6 +63,7 @@ def upload_video(
     privacy_status: str = "public",
     is_short: bool = False,
     thumbnail_path: str = None,
+    made_for_kids: bool = False,
 ) -> str:
     """Returns the uploaded video's YouTube ID."""
     youtube = get_authenticated_service(token_path, client_secret_path)
@@ -81,7 +82,7 @@ def upload_video(
         },
         "status": {
             "privacyStatus": privacy_status,
-            "selfDeclaredMadeForKids": False,
+            "selfDeclaredMadeForKids": made_for_kids,
         },
     }
 

@@ -304,6 +304,239 @@ def generate_script(channel_id: str, is_short: bool = False) -> dict:
     }
 
 
+KIDS_CONTENT_TYPES = ["rhyme", "story", "learning"]
+
+
+def pick_content_type(config: dict) -> str:
+    """Rotates randomly across the channel's configured content types
+    (rhyme/story/learning) so consecutive uploads aren't predictable."""
+    return random.choice(config.get("content_types") or KIDS_CONTENT_TYPES)
+
+
+def _kids_seed_path(config: dict, content_type: str) -> Path:
+    return ROOT / config["topics_seed_files"][content_type]
+
+
+def _kids_dedupe_key(channel_id: str, content_type: str) -> str:
+    """Topic-used tracking is kept separate per content type (a rhyme theme
+    and a story theme are unrelated), reusing the existing per-channel
+    used-topics file mechanism by just giving it a more specific key."""
+    return f"{channel_id}__{content_type}"
+
+
+def _generate_more_kids_topics(config: dict, content_type: str, existing: list, count: int = 20) -> list:
+    """Same idea as _generate_more_topics, but asks for fresh kids-content
+    THEMES (not full scripts) for the given content type, so the topic
+    pool keeps growing instead of repeating once the seed file runs out."""
+    if not (GEMINI_AVAILABLE and os.environ.get("GEMINI_API_KEY")):
+        return []
+    try:
+        client = genai_client.Client(api_key=os.environ["GEMINI_API_KEY"])
+        existing_sample = "\n".join(f"- {t}" for t in existing[-40:])
+        kind_description = {
+            "rhyme": "short original Hindi rhyme/poem themes for young children (things like a friendly animal, a fun activity, a season, a game)",
+            "story": "short moral story premises for young children, gentle and positive, no scary content",
+            "learning": "simple learning topics for young children (a letter, a number, a color, a shape, a category of things to name)",
+        }[content_type]
+        prompt = f"""You generate video theme ideas for a children's YouTube channel.
+
+Channel: {config['display_name']}
+This batch is for: {kind_description}
+
+Already-used themes (do NOT repeat these or close variations):
+{existing_sample}
+
+Generate {count} brand new theme ideas, each a single short line, each
+specific enough to build one video from. No numbering, no markdown, no
+quotes — just one theme per line."""
+
+        response = _generate_with_token_budget(client, prompt, max_output_tokens=800)
+        lines = [
+            re.sub(r"^[\d\.\-\)\s]+", "", line).strip()
+            for line in response.text.splitlines()
+        ]
+        new_topics = [line for line in lines if line and line not in existing]
+        return new_topics
+    except Exception as e:
+        print(f"WARNING: kids topic auto-generation failed ({e}); will loop existing topics instead.")
+        return []
+
+
+def pick_next_kids_topic(channel_id: str, config: dict, content_type: str) -> str:
+    topics_file = _kids_seed_path(config, content_type)
+    dedupe_key = _kids_dedupe_key(channel_id, content_type)
+    all_topics = [
+        line.strip() for line in topics_file.read_text().splitlines() if line.strip()
+    ]
+    used = get_used_topics(dedupe_key)
+    unused = [t for t in all_topics if t not in used]
+
+    if not unused:
+        new_topics = _generate_more_kids_topics(config, content_type, all_topics)
+        if new_topics:
+            with topics_file.open("a") as f:
+                f.write("\n" + "\n".join(new_topics) + "\n")
+            print(f"Added {len(new_topics)} new {content_type} themes to {topics_file.name}")
+            unused = new_topics
+        else:
+            unused = all_topics
+
+    topic = random.choice(unused)
+    mark_topic_used(dedupe_key, topic)
+    return topic
+
+
+def generate_kids_script_with_gemini(topic: str, config: dict, content_type: str,
+                                      mascot_name: str, length_seconds: int, language: str) -> dict:
+    client = genai_client.Client(api_key=os.environ["GEMINI_API_KEY"])
+    words_target = int(length_seconds * 2.2)  # kids narration is slower/more deliberate than facts-channel pace
+    language_name = LANGUAGE_NAMES.get(language, language)
+
+    if content_type == "rhyme":
+        content_instructions = f"""Write an ORIGINAL Hindi rhyme/poem for young children (ages 2-6), themed
+around: {topic}.
+
+CRITICAL: this must be a completely original composition. Do NOT reproduce,
+translate, or closely imitate any existing/traditional/copyrighted nursery
+rhyme, song, or poem (Hindi or otherwise) -- the theme is just inspiration,
+the words and structure must be entirely new.
+
+Write it purely in Hindi (Devanagari script) with NO English words mixed
+in -- mixing languages breaks the rhyme scheme (matra/meter) that makes it
+fun to sing. Use simple, everyday words a toddler already knows. Keep a
+clear, consistent rhythm and rhyme scheme throughout so it's easy to sing
+along to. Include a short repeated refrain/chorus line kids can join in
+on. Include at least one simple action kids can copy along with (clap,
+jump, sway) mentioned naturally in the lines. The character {mascot_name}
+should be the one singing/leading it, mentioned warmly by name at least
+once. Keep the whole mood joyful and gentle -- nothing scary, sad, or
+mean."""
+    elif content_type == "story":
+        content_instructions = f"""Write an ORIGINAL short moral story for young children (ages 3-7), themed
+around: {topic}. The story should feature {mascot_name} and teach one
+simple, positive lesson (sharing, kindness, honesty, trying again, etc.)
+without being preachy -- show it through what happens in the story, and
+only state the lesson gently at the very end.
+
+Language style: natural "Hinglish" code-mixing the way Indian children's
+content commonly does -- mostly simple Hindi with a handful of everyday
+English words mixed in naturally (like "friend", "happy", "party"), not
+two separate blocks of each language. Keep sentences short and simple.
+Nothing scary, violent, or sad -- gentle conflict at most (like feeling
+left out), always resolved warmly by the end."""
+    else:  # learning
+        content_instructions = f"""Write an ORIGINAL short learning segment for young children (ages 2-6),
+teaching: {topic}. {mascot_name} should be the one teaching it directly to
+the viewer, warm and encouraging, like a favorite teacher.
+
+Language style: natural bilingual teaching the way Indian children's
+educational content commonly does -- introduce each concept in Hindi and
+reinforce it with the equivalent simple English word right after (e.g.
+teaching a letter, number, or color by naming it both ways), so it doubles
+as gentle bilingual vocabulary building. Use call-and-response phrasing
+("bolo mere saath...") so a child watching can repeat along. Keep it
+repetitive and simple -- repetition is a feature for this age group, not
+something to avoid."""
+
+    prompt = f"""You are writing a script for a children's YouTube video.
+
+Channel: {config['display_name']}
+Content type: {content_type}
+Language: {language_name}
+
+{content_instructions}
+
+Respond in EXACTLY this format and nothing else — no markdown, no extra commentary:
+
+TITLE: <a warm, simple title in {language_name}, under 90 characters, that a
+parent scrolling would immediately understand is for young children>
+SCRIPT:
+<the spoken narration only -- no stage directions, no [visual cues], no
+markdown, just the words to be read aloud by the narrator>
+
+Target script length: approximately {words_target} words (about
+{length_seconds} seconds at a slow, clear, child-friendly speaking pace).
+End on a warm, gentle closing line -- do not end abruptly."""
+
+    max_tokens = _max_output_tokens_for(words_target)
+    response = _generate_with_token_budget(client, prompt, max_tokens)
+    return _parse_titled_response(response.text, fallback_topic=topic)
+
+
+def generate_kids_template(topic: str, config: dict, content_type: str,
+                            mascot_name: str, language: str) -> dict:
+    """Zero-dependency fallback so the pipeline still produces *something*
+    if Gemini is unavailable. Deliberately generic/short -- this should be
+    rare in practice since Gemini's free tier covers normal daily volume;
+    it exists purely so an API outage doesn't skip a day's upload entirely."""
+    if content_type == "rhyme":
+        script = (
+            f"चलो सब मिलकर गाएं, {mascot_name} के साथ। "
+            f"आज की कहानी है {topic} के बारे में। "
+            f"ताली बजाओ, संग गाओ, मज़ा करो, हाँ! "
+            f"यही तो है हमारी प्यारी सी धुन, फिर मिलेंगे, बाय बाय!"
+        )
+        title = f"{mascot_name} की मस्ती भरी कविता"
+    elif content_type == "story":
+        script = (
+            f"एक बार की बात है, {mascot_name} नाम का एक प्यारा दोस्त था। "
+            f"एक दिन उसे पता चला {topic} के बारे में एक important lesson। "
+            f"उसने सीखा कि हमेशा kind और honest रहना चाहिए। "
+            f"अंत में सब दोस्त बहुत खुश हुए। The end!"
+        )
+        title = f"{mascot_name} की एक प्यारी कहानी"
+    else:
+        script = (
+            f"नमस्ते दोस्तों! मैं हूँ {mascot_name}। आज हम सीखेंगे {topic}। "
+            f"बोलो मेरे साथ! बहुत बढ़िया! अब आप भी जान गए। "
+            f"Great job, दोस्तों! फिर मिलेंगे अगली सीख के साथ!"
+        )
+        title = f"{mascot_name} के साथ सीखो: {topic}"
+    return {"title": title, "script": script}
+
+
+def generate_kids_script(channel_id: str, is_short: bool = False) -> dict:
+    config = load_channel_config(channel_id)
+    content_type = pick_content_type(config)
+    topic = pick_next_kids_topic(channel_id, config, content_type)
+    mascot = config["mascot_map"][content_type]
+    mascot_name = config["mascot_names"][mascot]
+
+    # Rhymes need a single consistent language for the rhyme scheme/meter
+    # to actually work -- forced to Hindi regardless of the channel's
+    # general bilingual setting. Stories/learning use the channel's normal
+    # bilingual-mixed style.
+    if content_type == "rhyme" and config.get("rhymes_hindi_only", True):
+        language = "hi"
+    else:
+        language = pick_language(config)
+
+    length = config["short_length_seconds"] if is_short else config["video_length_seconds"]
+
+    if GEMINI_AVAILABLE and os.environ.get("GEMINI_API_KEY"):
+        try:
+            generated = generate_kids_script_with_gemini(
+                topic, config, content_type, mascot_name, length, language)
+        except Exception as e:
+            print(f"WARNING: Gemini call failed ({e}); using template fallback.")
+            generated = generate_kids_template(topic, config, content_type, mascot_name, language)
+    else:
+        generated = generate_kids_template(topic, config, content_type, mascot_name, language)
+
+    return {
+        "channel_id": channel_id,
+        "topic": topic,
+        "title": generated["title"],
+        "script": generated["script"],
+        "language": language,
+        "voice": _voice_for_language(config, language),
+        "is_short": is_short,
+        "content_type": content_type,
+        "mascot": mascot,
+        "mascot_name": mascot_name,
+    }
+
+
 if __name__ == "__main__":
     import argparse
 
