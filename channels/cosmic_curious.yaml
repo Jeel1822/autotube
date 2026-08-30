@@ -1,4 +1,4 @@
-python3 src/main.py cosmic_curious --shortchannel_id: cosmic_curious
+channel_id: cosmic_curious
 display_name: "Cosmic Curious"
 niche: "Science & space facts"
 tone: "curious, awe-struck, punchy — like telling a friend a mind-bending fact about the universe"
