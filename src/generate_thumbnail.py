@@ -24,6 +24,19 @@ from pathlib import Path
 # Used for both languages so English and Hindi thumbnails look consistent.
 FONT_NAME = "FreeSans"
 
+# High-CTR color schemes, rotated per video for visual variety across a
+# channel's thumbnail grid (same reason big channels don't reuse one
+# template every time -- a uniform look becomes easy to scroll past).
+# ASS colors are &HAABBGGRR (alpha, then BGR -- reverse of normal RGB hex).
+# BorderStyle 3 = opaque box behind the text using BackColour, which is
+# what gives the bold "banner" look instead of a faint outline.
+THUMBNAIL_SCHEMES = [
+    {"text": "&H0000FFFF", "bg": "&H000022E6"},  # yellow text / red-orange banner
+    {"text": "&H00FFFFFF", "bg": "&H00C81414"},  # white text / deep red banner
+    {"text": "&H0000FFFF", "bg": "&H00A02020"},  # yellow text / dark blue-red banner
+    {"text": "&H00FFFFFF", "bg": "&H0000A5FF"},  # white text / orange banner
+]
+
 
 def _get_video_duration(video_path: str) -> float:
     out = subprocess.run(
@@ -34,10 +47,12 @@ def _get_video_duration(video_path: str) -> float:
     return float(out.stdout.strip())
 
 
-def _shorten_for_thumbnail(title: str, language: str, max_words: int = 5) -> str:
-    """Thumbnails need a short, punchy phrase, not the full SEO title.
-    Uppercasing for impact only makes sense for Latin script -- Devanagari
-    has no case, so leave Hindi text as-is."""
+def _shorten_for_thumbnail(title: str, language: str, max_words: int = 4) -> str:
+    """Thumbnails need a short, punchy phrase, not the full SEO title --
+    fewer words than the title (4 vs the old 5) so the banner text is big
+    enough to read at feed/mobile thumbnail size. Uppercasing for impact
+    only makes sense for Latin script -- Devanagari has no case, so leave
+    Hindi text as-is."""
     words = title.strip().split()
     short = " ".join(words[:max_words])
     return short.upper() if language == "en" else short
@@ -49,9 +64,13 @@ def _escape_ass_text(text: str) -> str:
 
 
 def _write_thumbnail_ass(text: str, ass_path: Path, width: int, height: int,
-                          font_size: int) -> None:
+                          font_size: int, scheme: dict) -> None:
     escaped = _escape_ass_text(text)
     margin_v = int(height * 0.12)
+    # BorderStyle 3 + a thick Outline draws an opaque colored banner behind
+    # the text (using BackColour) rather than a thin outline around it --
+    # this is the bold "banner text" look that reads at a glance in a
+    # scrolling feed, vs. the old faint black-box style.
     content = f"""[Script Info]
 ScriptType: v4.00+
 PlayResX: {width}
@@ -61,7 +80,7 @@ ScaledBorderAndShadow: yes
 
 [V4+ Styles]
 Format: Name, Fontname, Fontsize, PrimaryColour, OutlineColour, BackColour, Bold, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
-Style: Default,{FONT_NAME},{font_size},&H00FFFFFF,&H00000000,&H99000000,1,3,3,0,2,60,60,{margin_v},1
+Style: Default,{FONT_NAME},{font_size},{scheme['text']},&H00000000,{scheme['bg']},1,3,14,0,2,50,50,{margin_v},1
 
 [Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
@@ -88,6 +107,8 @@ def generate_thumbnail(
     expect it to change what appears in the Shorts shelf itself.
     """
     try:
+        import random
+
         duration = _get_video_duration(video_path)
         # Grab a frame ~35% into the video -- usually past any fade-in and
         # well before a fade-out, without needing to know the video's
@@ -95,12 +116,15 @@ def generate_thumbnail(
         grab_time = max(duration * 0.35, 0.5)
 
         width, height = (1080, 1920) if portrait else (1280, 720)
-        font_size = 90 if portrait else 64
+        # Larger than before (was 90/64) -- bold banner text needs to read
+        # clearly even at small mobile thumbnail sizes.
+        font_size = 110 if portrait else 78
 
         short_text = _shorten_for_thumbnail(title, language)
+        scheme = random.choice(THUMBNAIL_SCHEMES)
 
         ass_path = Path(output_path).with_suffix(".ass")
-        _write_thumbnail_ass(short_text, ass_path, width, height, font_size)
+        _write_thumbnail_ass(short_text, ass_path, width, height, font_size, scheme)
         escaped_ass_path = str(ass_path).replace("\\", "\\\\").replace(":", "\\:")
 
         Path(output_path).parent.mkdir(parents=True, exist_ok=True)
