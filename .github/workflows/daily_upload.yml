@@ -60,20 +60,19 @@ jobs:
           restore-keys: pipeline-state-
 
       - name: Restore YouTube token (Cosmic Curious)
+        # To bring a new channel online later (e.g. Jungle Ke Dost):
+        # 1. Add a YOUTUBE_TOKEN_<CHANNEL> repo secret (Settings > Secrets
+        #    and variables > Actions), matching the process used here.
+        # 2. Add a step like this one for it, decoding into
+        #    tokens/<channel_id>_token.pickle.
+        # 3. Add its channel_id to ENABLED_CHANNELS below.
+        # Skipping any of these 3 steps means its scheduled uploads will
+        # fail with a missing-token error, not silently do nothing.
         env:
           TOKEN_COSMIC_CURIOUS: ${{ secrets.YOUTUBE_TOKEN_COSMIC_CURIOUS }}
         run: |
           mkdir -p tokens
           echo "$TOKEN_COSMIC_CURIOUS" | base64 -d > tokens/cosmic_curious_token.pickle
-          # Once Jungle Ke Dost has its own YouTube channel + OAuth token:
-          # 1. Add a YOUTUBE_TOKEN_JUNGLE_KE_DOST repo secret (same process
-          #    as Mind Bites — see README "YouTube API setup").
-          # 2. Add a line here:
-          #    echo "$TOKEN_JUNGLE_KE_DOST" | base64 -d > tokens/jungle_ke_dost_token.pickle
-          #    (and add TOKEN_JUNGLE_KE_DOST to this step's env: above)
-          # 3. Add "jungle_ke_dost" to ENABLED_CHANNELS below.
-          # Skipping any of these 3 steps means its scheduled uploads will
-          # fail with a missing-token error, not silently do nothing.
 
       # Manual single-channel run (for testing via "Run workflow" button)
       - name: Manual run
@@ -87,17 +86,19 @@ jobs:
             ${{ inputs.dry_run == 'true' && '--dry-run' || '' }}
 
       # Normal scheduled run — the scheduler decides what's due.
-      # ENABLED_CHANNELS restricts this to Mind Bites only, since the
-      # other 2 channels don't have YouTube tokens set up yet. Once you
-      # add YOUTUBE_TOKEN_THEN_AND_NOW / YOUTUBE_TOKEN_MONEY_SIMPLE
-      # secrets and restore them above, add those channel_ids here too
-      # (or delete the ENABLED_CHANNELS line entirely to run all of them).
+      # ENABLED_CHANNELS restricts this to Cosmic Curious only.
+      # Mind Bites is deliberately excluded (its YouTube token needs
+      # regenerating -- see README/troubleshooting notes -- and uploads to
+      # it are paused until that's resolved). Jungle Ke Dost, Then and Now,
+      # and Money Simple aren't wired up yet either. Add a channel_id here
+      # once its token is restored above and confirmed working (or delete
+      # the ENABLED_CHANNELS line entirely to run all channels).
       - name: Scheduled run
         if: github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.channel == '')
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
-          ENABLED_CHANNELS: "mind_bites,cosmic_curious"
+          ENABLED_CHANNELS: "cosmic_curious"
         run: |
           python src/scheduler.py
 
