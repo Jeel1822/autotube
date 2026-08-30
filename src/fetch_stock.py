@@ -15,15 +15,28 @@ import requests
 PEXELS_SEARCH_URL = "https://api.pexels.com/videos/search"
 
 
-def _extract_keywords(topic: str, max_words: int = 3) -> str:
-    """Very simple keyword extraction: drop stopwords, keep the meatiest words."""
+def _extract_keywords(topic: str, max_words: int = 4) -> str:
+    """Simple keyword extraction: drop stopwords, keep the meatiest words.
+    Auxiliary/linking verbs (is, are, was, can, would, etc.) and filler
+    words are filtered too -- without this, a topic like 'why rockets are
+    launched near the equator' extracted 'rockets are launched', which is
+    a weak, near-meaningless Pexels query and tends to return generic or
+    unrelated stock footage instead of anything topic-specific."""
     stopwords = {
         "the", "a", "an", "of", "in", "on", "to", "why", "what", "how",
         "your", "you", "we", "and", "is", "was", "it", "that", "for",
         "happened", "most", "people", "don't", "know", "after", "when",
+        "are", "were", "be", "been", "being", "do", "does", "did",
+        "can", "could", "will", "would", "should", "shall", "may",
+        "might", "must", "has", "have", "had", "this", "these", "those",
+        "from", "near", "where", "which", "who", "whom", "with", "by",
+        "at", "as", "if", "than", "then", "so", "not", "no", "actually",
+        "really", "just", "one", "single", "every", "any", "some",
+        "possible", "possibly", "or", "but", "there", "here",
+        "reason", "its", "it's", "happen", "happens", "happening",
     }
     words = re.findall(r"[a-zA-Z]+", topic.lower())
-    keywords = [w for w in words if w not in stopwords]
+    keywords = [w for w in words if w not in stopwords and len(w) > 2]
     return " ".join(keywords[:max_words]) if keywords else topic
 
 
