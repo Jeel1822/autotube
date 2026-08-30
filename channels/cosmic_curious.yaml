@@ -2,7 +2,7 @@ python3 src/main.py cosmic_curious --shortchannel_id: cosmic_curious
 display_name: "Cosmic Curious"
 niche: "Science & space facts"
 tone: "curious, awe-struck, punchy — like telling a friend a mind-bending fact about the universe"
-video_length_seconds: 480 # ~8 min long-form
+video_length_seconds: 150      # ~2.5 min long-form
 short_length_seconds: 45
 voice: "en-US-GuyNeural" # legacy fallback, kept for any code path still using it
 languages: ["en"]

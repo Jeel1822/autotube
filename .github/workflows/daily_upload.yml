@@ -59,12 +59,12 @@ jobs:
           key: pipeline-state-${{ github.run_id }}
           restore-keys: pipeline-state-
 
-      - name: Restore YouTube token (Mind Bites only, for now)
+      - name: Restore YouTube token (Cosmic Curious)
         env:
-          TOKEN_MIND_BITES: ${{ secrets.YOUTUBE_TOKEN_MIND_BITES }}
+          TOKEN_COSMIC_CURIOUS: ${{ secrets.YOUTUBE_TOKEN_COSMIC_CURIOUS }}
         run: |
           mkdir -p tokens
-          echo "$TOKEN_MIND_BITES" | base64 -d > tokens/mind_bites_token.pickle
+          echo "$TOKEN_COSMIC_CURIOUS" | base64 -d > tokens/cosmic_curious_token.pickle
           # Once Jungle Ke Dost has its own YouTube channel + OAuth token:
           # 1. Add a YOUTUBE_TOKEN_JUNGLE_KE_DOST repo secret (same process
           #    as Mind Bites — see README "YouTube API setup").
@@ -97,7 +97,7 @@ jobs:
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
-          ENABLED_CHANNELS: "mind_bites"
+          ENABLED_CHANNELS: "mind_bites,cosmic_curious"
         run: |
           python src/scheduler.py
 
