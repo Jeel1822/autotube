@@ -19,6 +19,7 @@ import os
 import json
 import random
 import re
+from datetime import datetime, timezone
 from pathlib import Path
 
 import yaml
@@ -76,6 +77,48 @@ def mark_topic_used(channel_id: str, topic: str) -> None:
     used = get_used_topics(channel_id)
     used.add(topic)
     _used_topics_path(channel_id).write_text(json.dumps(sorted(used)))
+
+
+def _todays_longform_path(channel_id: str) -> Path:
+    return STATE_DIR / f"{channel_id}_todays_longform.json"
+
+
+def save_todays_longform_topic(channel_id: str, topic: str) -> None:
+    """Called after a long-form run succeeds. Records today's topic so one
+    of the day's Shorts can reuse it (a short "recap" of the same topic)
+    instead of every Short being a totally unrelated pick -- this gives the
+    channel a coherent daily throughline across formats, and mirrors the
+    standard creator practice of carving Shorts out of long-form content
+    rather than treating every upload as a fully separate piece."""
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    STATE_DIR.mkdir(parents=True, exist_ok=True)
+    _todays_longform_path(channel_id).write_text(
+        json.dumps({"date": today, "topic": topic, "used_for_short": False})
+    )
+
+
+def get_recap_topic_for_short(channel_id: str) -> str | None:
+    """Returns today's long-form topic if it hasn't already been used for a
+    recap Short yet today, and marks it used so only one Short per day
+    reuses it (the other short slots still get fresh topics as before).
+    Returns None if there's no long-form topic recorded for today, or it's
+    already been used -- callers should fall back to picking a fresh topic
+    in that case."""
+    path = _todays_longform_path(channel_id)
+    if not path.exists():
+        return None
+    try:
+        data = json.loads(path.read_text())
+    except (json.JSONDecodeError, OSError):
+        return None
+
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    if data.get("date") != today or data.get("used_for_short"):
+        return None
+
+    data["used_for_short"] = True
+    path.write_text(json.dumps(data))
+    return data.get("topic")
 
 
 def _generate_more_topics(config: dict, existing: list, count: int = 20) -> list:
@@ -275,9 +318,9 @@ def generate_with_template(topic: str, config: dict, language: str) -> dict:
     return {"title": title, "script": script}
 
 
-def generate_script(channel_id: str, is_short: bool = False) -> dict:
+def generate_script(channel_id: str, is_short: bool = False, forced_topic: str = None) -> dict:
     config = load_channel_config(channel_id)
-    topic = pick_next_topic(channel_id, config)
+    topic = forced_topic or pick_next_topic(channel_id, config)
     language = pick_language(config)
     length = config["short_length_seconds"] if is_short else config["video_length_seconds"]
 

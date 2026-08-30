@@ -25,8 +25,9 @@ from pathlib import Path
 import edge_tts
 
 
-async def _synthesize(text: str, voice: str, audio_out: Path) -> list:
-    communicate = edge_tts.Communicate(text, voice)
+async def _synthesize(text: str, voice: str, audio_out: Path,
+                       rate: str = "+0%", pitch: str = "+0Hz") -> list:
+    communicate = edge_tts.Communicate(text, voice, rate=rate, pitch=pitch)
     word_boundaries = []
 
     with open(audio_out, "wb") as audio_file:
@@ -74,13 +75,19 @@ def _estimate_word_timings(text: str, audio_out: Path) -> list:
     return timings
 
 
-def synthesize_speech(text: str, voice: str, audio_out: str, timing_out: str) -> None:
-    """Sync wrapper. audio_out should end in .mp3, timing_out in .json"""
+def synthesize_speech(text: str, voice: str, audio_out: str, timing_out: str,
+                       rate: str = "+0%", pitch: str = "+0Hz") -> None:
+    """Sync wrapper. audio_out should end in .mp3, timing_out in .json.
+
+    rate/pitch let a caller nudge delivery away from the voice's flat
+    default cadence -- e.g. a slightly slower rate ("-4%") tends to read
+    as more natural/less rushed than edge-tts's default speed, which can
+    otherwise sound like it's reading at a uniform, robotic clip."""
     audio_out = Path(audio_out)
     timing_out = Path(timing_out)
     audio_out.parent.mkdir(parents=True, exist_ok=True)
 
-    word_boundaries = asyncio.run(_synthesize(text, voice, audio_out))
+    word_boundaries = asyncio.run(_synthesize(text, voice, audio_out, rate, pitch))
 
     if not word_boundaries:
         print(f"WARNING: voice '{voice}' returned no WordBoundary events "

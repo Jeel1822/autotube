@@ -10,6 +10,7 @@ Usage:
 This is what the GitHub Actions workflow calls, once per video, on a schedule.
 """
 import argparse
+import random
 import re
 import sys
 import tempfile
@@ -18,7 +19,10 @@ from pathlib import Path
 
 import yaml
 
-from generate_script import generate_script, generate_kids_script
+from generate_script import (
+    generate_script, generate_kids_script,
+    save_todays_longform_topic, get_recap_topic_for_short,
+)
 from tts import synthesize_speech
 from fetch_stock import fetch_clips_for_topic
 from assemble_video import assemble_video
@@ -114,7 +118,19 @@ def run(channel_id: str, is_short: bool, privacy_status: str = "public",
         if is_kids_channel:
             result = generate_kids_script(channel_id, is_short=is_short)
         else:
-            result = generate_script(channel_id, is_short=is_short)
+            # For a Short, first check whether today's long-form video
+            # already happened and hasn't been "recapped" yet -- if so,
+            # reuse that topic instead of picking a fresh unrelated one.
+            # This gives the channel one coherent daily throughline
+            # (long-form + a matching recap Short) instead of 6 fully
+            # disconnected topics per day, which is the standard
+            # repurposing pattern most channels use Shorts for.
+            forced_topic = get_recap_topic_for_short(channel_id) if is_short else None
+            result = generate_script(channel_id, is_short=is_short, forced_topic=forced_topic)
+            if not is_short:
+                # Record today's long-form topic so the next Short run
+                # (this same scheduler tick or a later one) can pick it up.
+                save_todays_longform_topic(channel_id, result["topic"])
         topic, script_text = result["topic"], result["script"]
         language, voice = result["language"], result["voice"]
         print(f"Topic: {topic}")
@@ -126,7 +142,13 @@ def run(channel_id: str, is_short: bool, privacy_status: str = "public",
         # 2. TTS
         audio_path = tmp / "audio.mp3"
         timing_path = tmp / "timing.json"
-        synthesize_speech(script_text, voice, str(audio_path), str(timing_path))
+        # A touch slower than default (-6% to -2%, randomized per video)
+        # reads as more natural/deliberate than edge-tts's default pace,
+        # and varying it slightly run-to-run avoids every single video on
+        # the channel sounding identically, uniformly paced -- a small
+        # cue that (subconsciously, across many videos) reads as "AI".
+        rate = f"{random.randint(-6, -2)}%"
+        synthesize_speech(script_text, voice, str(audio_path), str(timing_path), rate=rate)
         print(f"Audio generated: {audio_path}")
 
         # 3+4. Visuals + assembly — kids channel uses the puppet-animation
