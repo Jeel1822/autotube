@@ -81,7 +81,7 @@ jobs:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
         run: |
-          python src/main.py "${{ inputs.channel }}" \
+          python -m src.main "${{ inputs.channel }}" \
             ${{ inputs.short == 'true' && '--short' || '' }} \
             ${{ inputs.dry_run == 'true' && '--dry-run' || '' }}
 
@@ -100,7 +100,7 @@ jobs:
           PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
           ENABLED_CHANNELS: "cosmic_curious"
         run: |
-          python src/scheduler.py
+          python -m src.scheduler
 
       - name: Save pipeline state
         if: always()

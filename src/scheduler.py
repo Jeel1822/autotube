@@ -115,7 +115,7 @@ def main():
             ran_any = True
             label = "SHORT" if is_short else "LONG-FORM"
             print(f"\n### {channel_id} — {label} due (slot {slot_id}, now {now.strftime('%H:%M')} UTC) ###\n")
-            cmd = [sys.executable, str(ROOT / "src" / "main.py"), channel_id]
+            cmd = [sys.executable, "-m", "src.main", channel_id]
             if is_short:
                 cmd.append("--short")
 
