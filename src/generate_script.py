@@ -24,6 +24,8 @@ from pathlib import Path
 
 import yaml
 
+from trend_scout import get_trending_topic
+
 try:
     from google import genai as genai_client
     GEMINI_AVAILABLE = True
@@ -320,7 +322,16 @@ def generate_with_template(topic: str, config: dict, language: str) -> dict:
 
 def generate_script(channel_id: str, is_short: bool = False, forced_topic: str = None) -> dict:
     config = load_channel_config(channel_id)
-    topic = forced_topic or pick_next_topic(channel_id, config)
+    if forced_topic:
+        topic = forced_topic
+    else:
+        # Trend Scout is optional (config["trend_aware"]) and fails safe --
+        # returns None on any issue (no API key, network error, empty
+        # signal), in which case we fall straight through to the existing
+        # static topic list exactly as before. This never makes the
+        # pipeline less reliable, only potentially more current.
+        topic = get_trending_topic(channel_id, config) or pick_next_topic(channel_id, config)
+        mark_topic_used(channel_id, topic)
     language = pick_language(config)
     length = config["short_length_seconds"] if is_short else config["video_length_seconds"]
 

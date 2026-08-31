@@ -9,6 +9,15 @@ languages: ["en"]
 voices:
   en: "en-US-AndrewNeural"
 topics_seed_file: "channels/cosmic_curious_topics.txt"
+# Trend Scout: pulls real current signal (r/space top posts this week +
+# recent YouTube search results for the niche) and has Gemini synthesize
+# a fresh, original topic from it, instead of always drawing from the
+# static file above. Fails safe -- falls back to the static list if
+# trend data isn't available for any reason (missing YOUTUBE_DATA_API_KEY
+# secret, network issue, empty results). YOUTUBE_DATA_API_KEY is optional;
+# Reddit signal alone still works without it.
+trend_aware: true
+trend_subreddit: "space"
 upload_time_utc: "13:30"        # long-form upload time
 shorts_upload_times_utc: ["09:30", "11:30", "15:30", "17:30", "19:30"]
 tags: ["space facts", "science facts", "astronomy", "did you know", "universe facts", "physics facts"]
