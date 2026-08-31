@@ -99,7 +99,18 @@ def assemble_video(
         for i, clip in enumerate(clip_paths):
             norm_path = tmp / f"norm_{i}.mp4"
             subprocess.run([
-                "ffmpeg", "-y", "-i", clip, "-t", str(per_clip_duration),
+                # -stream_loop -1 repeats the input indefinitely; -t then
+                # caps the output at the requested duration. Without the
+                # loop, a source clip shorter than per_clip_duration (very
+                # common with free stock footage -- many clips are only
+                # 5-10s) would just end early, making the stitched
+                # background video shorter than the audio. The final
+                # assembly step uses -shortest, which then silently
+                # truncates the AUDIO to match that short video --
+                # cutting the script off mid-sentence with no error or
+                # warning anywhere in the pipeline.
+                "ffmpeg", "-y", "-stream_loop", "-1", "-i", clip,
+                "-t", str(per_clip_duration),
                 "-vf", f"scale={width}:{height}:force_original_aspect_ratio=increase,"
                        f"crop={width}:{height},fps=30",
                 "-an", str(norm_path),
