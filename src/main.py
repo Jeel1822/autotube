@@ -9,6 +9,8 @@ Usage:
 
 This is what the GitHub Actions workflow calls, once per video, on a schedule.
 """
+from dotenv import load_dotenv
+load_dotenv()
 import argparse
 import random
 import re
@@ -19,17 +21,18 @@ from pathlib import Path
 
 import yaml
 
-from generate_script import (
+from src.generate_script import (
     generate_script, generate_kids_script,
     save_todays_longform_topic, get_recap_topic_for_short,
 )
-from tts import synthesize_speech
-from fetch_stock import fetch_clips_for_topic
-from assemble_video import assemble_video
-from generate_thumbnail import generate_thumbnail
-from generate_kids_video import generate_kids_video
-from generate_mascot_assets import generate_mascot_assets
-from upload_youtube import upload_video
+from src.quality_gate import validate_and_repair
+from src.tts import synthesize_speech
+from src.fetch_stock import fetch_clips_for_topic
+from src.assemble_video import assemble_video
+from src.generate_thumbnail import generate_thumbnail
+from src.generate_kids_video import generate_kids_video
+from src.generate_mascot_assets import generate_mascot_assets
+from src.upload_youtube import upload_video
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -133,6 +136,35 @@ def run(channel_id: str, is_short: bool, privacy_status: str = "public",
                 save_todays_longform_topic(channel_id, result["topic"])
         topic, script_text = result["topic"], result["script"]
         language, voice = result["language"], result["voice"]
+
+        # Quality Gate
+        # Never run this for the kids puppet pipeline yet; it has different
+        # language/content requirements.
+        if not is_kids_channel:
+            target_words = int(
+                (config["short_length_seconds"] if is_short
+                else config["video_length_seconds"]) * 2.2
+            )
+
+            script_text, quality_review = validate_and_repair(
+                topic=topic,
+                script=script_text,
+                config=config,
+                target_words=target_words,
+            )
+
+            result["script"] = script_text
+
+            print(
+                f"Quality score: "
+                f"{quality_review.get('score', 0):.1f}/10"
+            )
+
+            if not quality_review.get("approved"):
+                raise RuntimeError(
+                    "Quality Gate rejected the script after all repair attempts."
+                )
+
         print(f"Topic: {topic}")
         if is_kids_channel:
             print(f"Content type: {result['content_type']} | Mascot: {result['mascot_name']}")

@@ -1,0 +1,683 @@
+
+"""
+topic_brain.py
+
+Cosmic Curious V2 topic discovery engine.
+
+Pipeline:
+    signals -> candidate generation -> duplicate filtering -> scoring -> winner
+
+Designed to fail safely so the existing pipeline can continue working.
+
+V2 improvements:
+- Strong scientific-accuracy hard constraint
+- Explicit misleading-claim detection
+- Penalizes sensational but technically misleading topics
+- Rewards precise curiosity over fake/impossible claims
+- Performs a final winner sanity check
+- Can ask Gemini to replace a scientifically weak winner
+"""
+
+import json
+import os
+import re
+from pathlib import Path
+
+from google import genai
+
+GEMINI_MODEL = "gemini-3.5-flash-lite"
+
+ROOT = Path(__file__).resolve().parent.parent
+STATE_DIR = ROOT / "state"
+
+
+def _gemini():
+    key = os.environ.get("GEMINI_API_KEY")
+
+    if not key:
+        raise RuntimeError("GEMINI_API_KEY is not set")
+
+    return genai.Client(api_key=key)
+
+
+def _clean_lines(text):
+    lines = []
+
+    for line in text.splitlines():
+        line = re.sub(r"^[\d\.\-\)\s]+", "", line).strip()
+
+        if line:
+            lines.append(line)
+
+    return lines
+
+
+def _clean_json(text):
+    """
+    Extract JSON from Gemini even if it accidentally wraps the response
+    in markdown code fences.
+    """
+    text = text.strip()
+
+    text = re.sub(
+        r"^```(?:json)?\s*",
+        "",
+        text,
+        flags=re.IGNORECASE,
+    )
+
+    text = re.sub(
+        r"\s*```$",
+        "",
+        text,
+    ).strip()
+
+    start = text.find("[")
+
+    if start == -1:
+        raise ValueError("Gemini did not return a JSON array.")
+
+    end = text.rfind("]")
+
+    if end == -1:
+        raise ValueError("Gemini returned incomplete JSON.")
+
+    return json.loads(text[start:end + 1])
+
+
+def generate_candidates(config, existing_topics, count=30):
+    """
+    Generate a large batch of potential topics.
+
+    The model is explicitly instructed to avoid generic educational topics
+    and focus on unusual, visually explainable scientific questions.
+    """
+
+    client = _gemini()
+
+    existing = "\n".join(
+        f"- {topic}"
+        for topic in existing_topics[-100:]
+    )
+
+    prompt = f"""
+You are the head topic researcher for a high-retention faceless YouTube
+channel called "{config['display_name']}".
+
+NICHE:
+{config['niche']}
+
+CHANNEL STYLE:
+{config['tone']}
+
+We want topics substantially better than ordinary "science facts".
+
+Generate {count} ORIGINAL topic ideas.
+
+The ideal topic should have:
+
+- an irresistible curiosity gap
+- a surprising scientific reveal
+- a concrete answer
+- strong visual possibilities
+- enough scientific substance for a 30-60 second Short
+- potential for a longer video later
+- preferably something most viewers have never considered
+- accurate science rather than fake mysteries
+- a premise that can be explained honestly without exaggeration
+
+Prioritize topics involving:
+
+astronomy
+black holes
+strange planets
+stellar evolution
+extreme physics
+time
+gravity
+space exploration
+cosmology
+unusual planetary behavior
+unknown objects
+weird cosmic environments
+real scientific discoveries
+
+Avoid:
+
+generic "what is X" topics
+basic school-level facts
+overused facts
+listicles
+celebrity science
+obvious clickbait
+fake science
+topics requiring unsupported speculation
+topics that depend on misleading wording
+topics that only sound interesting because they make an impossible claim
+topics already covered below
+
+IMPORTANT SCIENTIFIC ACCURACY RULE:
+
+Scientific accuracy is a HARD CONSTRAINT.
+
+Do not create a topic merely because it sounds shocking.
+
+A topic may explore a hypothetical scenario, but the underlying physics
+must remain scientifically defensible.
+
+Be especially careful with claims involving:
+
+- faster-than-light travel
+- exceeding the speed of light
+- exceeding the speed of sound
+- impossible energy requirements
+- black hole behavior
+- time travel
+- gravity
+- wormholes
+- extreme temperatures
+- extreme distances
+- destroying Earth
+- reversing time
+- "breaking the laws of physics"
+- claims that contradict established science
+
+If an interesting idea depends on a technical distinction, phrase the topic
+so an ordinary viewer will not be misled.
+
+Prefer precise curiosity such as:
+
+"Why sound behaves strangely inside a neutron star"
+
+instead of:
+
+"Why you could outrun the fastest sound wave in the universe"
+
+The first can still be fascinating without relying on sensational wording.
+
+Never sacrifice scientific accuracy simply to increase clickability.
+
+ALREADY COVERED:
+{existing}
+
+Good style examples:
+
+Why the sky is dark at night even though there are trillions of stars
+What would happen if you fell into a black hole
+Why Venus spins backwards compared with most planets
+The star that's so big it would swallow Saturn's orbit
+Why Mercury has ice despite temperatures hot enough to melt lead
+
+BAD examples:
+
+What is a black hole?
+What is gravity?
+10 facts about space
+Interesting facts about planets
+What is the solar system?
+
+Make each idea a complete topic/question.
+
+Return ONLY one topic per line.
+No numbering.
+No explanations.
+No markdown.
+"""
+
+    response = client.models.generate_content(
+        model=GEMINI_MODEL,
+        contents=prompt,
+    )
+
+    return _clean_lines(response.text)
+
+
+def score_candidates(config, candidates):
+    """
+    Score every candidate on six dimensions.
+
+    Scientific accuracy is treated as a hard constraint rather than merely
+    another popularity metric.
+    """
+
+    client = _gemini()
+
+    topics = "\n".join(
+        f"{i+1}. {topic}"
+        for i, topic in enumerate(candidates)
+    )
+
+    prompt = f"""
+You are the editorial director and scientific fact-checker of
+"{config['display_name']}".
+
+Evaluate these YouTube topic candidates for a science and space channel.
+
+The goal is NOT simply to find the most sensational title.
+
+The goal is to find the topic that combines:
+
+high curiosity
+scientific accuracy
+originality
+visual potential
+short-form potential
+long-form potential
+
+Score each from 1-10:
+
+NOVELTY
+How uncommon or fresh is the idea?
+
+CURIOSITY
+How strongly does the title make someone want the answer?
+
+SCIENCE
+How scientifically accurate, defensible, interesting and meaningful is
+the premise?
+
+VISUAL
+Can the idea be shown with compelling space imagery/video?
+
+SHORTS
+Can it work extremely well in 30-60 seconds?
+
+LONGFORM
+Could it later become a deeper video?
+
+Use these weights:
+
+Novelty 20%
+Curiosity 25%
+Science 15%
+Visual 15%
+Shorts 15%
+Longform 10%
+
+TOTAL should be calculated from those weights and expressed as a score
+out of 100.
+
+IMPORTANT SCIENTIFIC ACCURACY RULE:
+
+Scientific accuracy is a HARD CONSTRAINT, not merely one scoring factor.
+
+Do NOT reward a topic simply because it sounds impossible, shocking,
+or sensational.
+
+Before scoring the topic, evaluate whether its central premise is
+scientifically defensible.
+
+Pay special attention to claims involving:
+
+- exceeding the speed of light
+- exceeding the speed of sound
+- impossible energy requirements
+- black hole behavior
+- time travel
+- gravity
+- extreme distances or temperatures
+- hypothetical objects
+- "destroying Earth" scenarios
+- claims that contradict established physics
+
+A topic may be hypothetical, but the wording must make the hypothetical
+nature clear.
+
+If the premise depends on a subtle scientific distinction, evaluate whether
+an average viewer could misunderstand the claim.
+
+For example:
+
+"Why you could outrun the fastest sound wave in the universe inside a
+neutron star"
+
+must NOT receive a high score merely because it creates curiosity.
+
+The underlying physics must be checked carefully.
+
+If the topic is technically defensible but its wording is likely to
+mislead a normal viewer, reduce the score and explain why.
+
+Prefer scientifically precise curiosity over sensational exaggeration.
+
+SCIENCE SCORE RULES:
+
+1-3:
+Scientifically incorrect, pseudoscientific, impossible, or substantially
+misleading premise.
+
+4-5:
+Has some legitimate science but relies heavily on questionable wording,
+an extreme technicality, or unsupported assumptions.
+
+6-7:
+Generally scientifically defensible but could use more precise wording.
+
+8-9:
+Strong scientific basis, interesting and accurately framed.
+
+10:
+Exceptionally strong scientific premise with clear factual grounding.
+
+MISLEADING CLAIM PENALTY:
+
+If the topic contains an exaggerated or potentially misleading claim,
+reduce its TOTAL score substantially even if its curiosity score is high.
+
+A topic with excellent curiosity but questionable science MUST lose to a
+slightly less sensational topic with excellent scientific accuracy.
+
+Do NOT let a high CURIOSITY score compensate for bad SCIENCE.
+
+If SCIENCE <= 4, the topic should normally NOT be eligible to win.
+
+If SCIENCE <= 3, it should be treated as rejected.
+
+If SCIENCE is 5-6 and the wording is potentially misleading, it should
+usually lose to a scientifically cleaner alternative.
+
+Before selecting a winner, mentally ask:
+
+1. Is the central claim scientifically defensible?
+2. Could an average viewer interpret the title incorrectly?
+3. Does the wording exaggerate what scientists actually know?
+4. Is the scenario clearly hypothetical when necessary?
+5. Can the topic be explained accurately in 30-60 seconds?
+6. Would a physicist consider the title misleading?
+7. Does the topic depend on a technical loophole rather than genuinely
+   interesting science?
+
+If the answer to #1 or #6 is concerning, significantly lower the score.
+
+Do NOT invent scientific certainty just to make a topic more clickable.
+
+IMPORTANT:
+
+A less sensational but scientifically excellent topic is preferable to a
+sensational topic with questionable wording.
+
+The final winner should be something we can confidently turn into a
+factually accurate YouTube video.
+
+Return ONLY valid JSON in this exact structure:
+
+[
+  {{
+    "topic": "...",
+    "novelty": 0,
+    "curiosity": 0,
+    "science": 0,
+    "visual": 0,
+    "shorts": 0,
+    "longform": 0,
+    "total": 0,
+    "reason": "one short sentence"
+  }}
+]
+
+TOPICS:
+
+{topics}
+"""
+
+    response = client.models.generate_content(
+        model=GEMINI_MODEL,
+        contents=prompt,
+    )
+
+    return _clean_json(response.text)
+
+
+def _is_scientifically_weak(item):
+    """
+    Local safety check.
+
+    Gemini is responsible for the actual scientific evaluation, but this
+    prevents a low-science candidate from winning due to a high curiosity
+    score.
+    """
+
+    try:
+        science = float(item.get("science", 0))
+    except Exception:
+        science = 0
+
+    return science < 5
+
+
+def _select_best_scientifically_valid(scored):
+    """
+    Select the highest-scoring candidate that passes the minimum science
+    threshold.
+
+    If every candidate is weak, return None so the caller can fall back
+    safely instead of publishing a questionable topic.
+    """
+
+    valid = [
+        item
+        for item in scored
+        if not _is_scientifically_weak(item)
+    ]
+
+    if not valid:
+        return None
+
+    valid.sort(
+        key=lambda item: item.get("total", 0),
+        reverse=True,
+    )
+
+    return valid[0]
+
+
+def _refine_winner_if_needed(config, winner):
+    """
+    If the winner is scientifically defensible but its wording is
+    potentially sensational or misleading, ask Gemini to improve the
+    wording while preserving the underlying idea.
+
+    Returns the original topic if no refinement is necessary.
+    """
+
+    if not winner:
+        return None
+
+    try:
+        science = float(winner.get("science", 0))
+    except Exception:
+        science = 0
+
+    topic = winner["topic"]
+
+    # Strong science score means the title is probably already safe.
+    if science >= 8:
+        return topic
+
+    client = _gemini()
+
+    prompt = f"""
+You are the final scientific title editor for a science and space YouTube
+channel.
+
+Original topic:
+
+{topic}
+
+Scientific score:
+{science}/10
+
+Editorial reason:
+{winner.get('reason', '')}
+
+Rewrite this topic only if its wording could mislead an ordinary viewer.
+
+Requirements:
+
+- Preserve the interesting scientific idea.
+- Make the wording scientifically precise.
+- Do not make it boring.
+- Do not turn it into a generic "What is..." question.
+- Do not add unsupported claims.
+- Do not exaggerate.
+- Keep the curiosity gap.
+- Make it suitable for a 30-60 second YouTube Short.
+- Keep it under 120 characters where possible.
+
+Return ONLY the improved topic phrase.
+"""
+
+    response = client.models.generate_content(
+        model=GEMINI_MODEL,
+        contents=prompt,
+    )
+
+    refined = response.text.strip()
+    refined = refined.strip('"').strip("'")
+    refined = refined.splitlines()[0].strip()
+
+    if not refined:
+        return topic
+
+    if len(refined) > 200:
+        return topic
+
+    return refined
+
+
+def choose_winner(config, candidates):
+    """
+    Generate scores and select the highest quality scientifically valid
+    topic.
+    """
+
+    if not candidates:
+        return None
+
+    scored = score_candidates(config, candidates)
+
+    if not scored:
+        return candidates[0]
+
+    # Clean malformed score entries rather than crashing the pipeline.
+    cleaned = []
+
+    for item in scored:
+        if not isinstance(item, dict):
+            continue
+
+        if not item.get("topic"):
+            continue
+
+        try:
+            item["total"] = float(item.get("total", 0))
+        except Exception:
+            item["total"] = 0
+
+        try:
+            item["science"] = float(item.get("science", 0))
+        except Exception:
+            item["science"] = 0
+
+        cleaned.append(item)
+
+    scored = cleaned
+
+    if not scored:
+        return candidates[0]
+
+    scored.sort(
+        key=lambda item: item.get("total", 0),
+        reverse=True,
+    )
+
+    print("\n=== TOPIC BRAIN ===")
+
+    for item in scored[:5]:
+        print(
+            f"{item['total']:>5}/100  "
+            f"Science {item['science']}/10  "
+            f"{item['topic']}"
+        )
+
+    # Never allow a low-science candidate to automatically win.
+    winner = _select_best_scientifically_valid(scored)
+
+    if winner is None:
+        print(
+            "\nWARNING: Topic Brain found no candidate with sufficient "
+            "scientific confidence."
+        )
+        return None
+
+    # If the raw highest scorer was rejected, show why.
+    raw_winner = scored[0]
+
+    if raw_winner["topic"] != winner["topic"]:
+        print(
+            f"\nRejected raw winner due to scientific score: "
+            f"{raw_winner['topic']} "
+            f"(Science {raw_winner['science']}/10)"
+        )
+
+    # Refine borderline titles that may be scientifically valid but poorly
+    # worded.
+    final_topic = _refine_winner_if_needed(
+        config,
+        winner,
+    )
+
+    if final_topic != winner["topic"]:
+        print(
+            f"\nTopic Brain: refined wording for scientific precision:"
+            f"\n  Before: {winner['topic']}"
+            f"\n  After:  {final_topic}"
+        )
+
+    print(
+        f"\nWINNER: {final_topic}"
+        f" ({winner['total']}/100)"
+    )
+
+    return final_topic
+
+
+def discover_topic(config, existing_topics):
+    """
+    Main safe entry point.
+
+    Returns:
+        topic string
+        or None if the topic brain fails.
+    """
+
+    try:
+        candidates = generate_candidates(
+            config,
+            existing_topics,
+            count=30,
+        )
+
+        if not candidates:
+            return None
+
+        # Remove exact duplicates while preserving order.
+        candidates = list(dict.fromkeys(candidates))
+
+        print(
+            f"Topic Brain: generated {len(candidates)} candidates"
+        )
+
+        return choose_winner(
+            config,
+            candidates,
+        )
+
+    except Exception as e:
+        print(
+            f"WARNING: Topic Brain failed ({e}); "
+            f"falling back to existing topic system."
+        )
+
+        return None
+

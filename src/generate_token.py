@@ -14,7 +14,7 @@ Usage:
 import argparse
 from pathlib import Path
 
-from upload_youtube import get_authenticated_service
+from src.upload_youtube import get_authenticated_service
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()

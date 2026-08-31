@@ -10,7 +10,7 @@ Run from the repo root: python3 check_timing.py
 """
 import sys
 sys.path.insert(0, "src")
-from tts import synthesize_speech
+from src.tts import synthesize_speech
 import json
 
 text = "आओ बच्चों पास हमारे रंग-बिरंगे प्यारे सारे"

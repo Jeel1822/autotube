@@ -29,7 +29,7 @@ import subprocess
 import tempfile
 from pathlib import Path
 
-from assemble_video import (
+from src.assemble_video import (
     LANDSCAPE,
     PORTRAIT,
     _get_audio_duration,
