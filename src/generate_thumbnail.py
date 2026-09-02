@@ -89,17 +89,66 @@ Dialogue: 0,0:00:00.00,0:00:01.00,Default,,0,0,0,,{escaped}
     ass_path.write_text(content, encoding="utf-8")
 
 
+def _frame_detail_score(frame_path: Path) -> float:
+    """Scores a frame by pixel-value standard deviation (grayscale) --
+    a flat, low-detail frame (a fade, a transition, a mostly-solid-color
+    moment) has low variance; a frame with real visible content has high
+    variance. Used to pick the best of several candidate thumbnail frames
+    instead of trusting one fixed timestamp, which can land on a bad
+    moment depending on what stock clip happened to be playing there."""
+    from PIL import Image, ImageStat
+    with Image.open(frame_path) as img:
+        stat = ImageStat.Stat(img.convert("L"))
+        return stat.stddev[0]
+
+
+def _pick_best_frame_time(video_path: str, duration: float, tmp_dir: Path,
+                           candidates: int = 5) -> float:
+    """Extracts several cheap low-res candidate frames spread across the
+    middle 65% of the video and returns the timestamp of whichever has
+    the most visual detail."""
+    start, end = duration * 0.15, duration * 0.80
+    if end <= start:
+        return max(duration * 0.35, 0.5)
+
+    step = (end - start) / max(candidates - 1, 1)
+    best_time, best_score = start, -1.0
+
+    for i in range(candidates):
+        t = start + step * i
+        candidate_path = tmp_dir / f"candidate_{i}.jpg"
+        try:
+            subprocess.run([
+                "ffmpeg", "-y", "-ss", str(t), "-i", video_path,
+                "-vframes", "1", "-vf", "scale=320:-1",
+                "-q:v", "5", str(candidate_path),
+            ], check=True, capture_output=True, timeout=15)
+            score = _frame_detail_score(candidate_path)
+            if score > best_score:
+                best_score, best_time = score, t
+        except (subprocess.CalledProcessError, subprocess.TimeoutExpired, OSError):
+            continue
+
+    return best_time
+
+
 def generate_thumbnail(
     video_path: str,
     title: str,
     output_path: str,
     language: str = "en",
     portrait: bool = False,
+    override_text: str = None,
 ) -> str | None:
     """Extracts a frame and overlays a short bold title. Returns
     output_path on success, or None if generation failed for any reason
     (caller should treat this as non-fatal and upload without a custom
     thumbnail).
+
+    override_text: if provided (e.g. from thumbnail_agent's chosen
+    concept), used verbatim instead of auto-shortening the title. Still
+    subject to the same length/case handling as the auto-derived text
+    isn't applied here -- pass pre-formatted text.
 
     Note on Shorts: YouTube's Shorts feed largely ignores the thumbnails.set
     API and picks its own cover frame, so this is best-effort for shorts --
@@ -108,19 +157,16 @@ def generate_thumbnail(
     """
     try:
         import random
+        import tempfile
 
         duration = _get_video_duration(video_path)
-        # Grab a frame ~35% into the video -- usually past any fade-in and
-        # well before a fade-out, without needing to know the video's
-        # internal structure.
-        grab_time = max(duration * 0.35, 0.5)
 
         width, height = (1080, 1920) if portrait else (1280, 720)
         # Larger than before (was 90/64) -- bold banner text needs to read
         # clearly even at small mobile thumbnail sizes.
         font_size = 110 if portrait else 78
 
-        short_text = _shorten_for_thumbnail(title, language)
+        short_text = override_text or _shorten_for_thumbnail(title, language)
         scheme = random.choice(THUMBNAIL_SCHEMES)
 
         ass_path = Path(output_path).with_suffix(".ass")
@@ -128,13 +174,17 @@ def generate_thumbnail(
         escaped_ass_path = str(ass_path).replace("\\", "\\\\").replace(":", "\\:")
 
         Path(output_path).parent.mkdir(parents=True, exist_ok=True)
-        subprocess.run([
-            "ffmpeg", "-y", "-ss", str(grab_time), "-i", video_path,
-            "-vframes", "1",
-            "-vf", f"scale={width}:{height}:force_original_aspect_ratio=increase,"
-                   f"crop={width}:{height},subtitles='{escaped_ass_path}'",
-            "-q:v", "2", output_path,
-        ], check=True, capture_output=True)
+
+        with tempfile.TemporaryDirectory() as tmp:
+            grab_time = _pick_best_frame_time(video_path, duration, Path(tmp))
+
+            subprocess.run([
+                "ffmpeg", "-y", "-ss", str(grab_time), "-i", video_path,
+                "-vframes", "1",
+                "-vf", f"scale={width}:{height}:force_original_aspect_ratio=increase,"
+                       f"crop={width}:{height},subtitles='{escaped_ass_path}'",
+                "-q:v", "2", output_path,
+            ], check=True, capture_output=True)
 
         ass_path.unlink(missing_ok=True)
         return output_path

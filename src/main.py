@@ -171,6 +171,21 @@ def run(channel_id: str, is_short: bool, privacy_status: str = "public",
         print(f"Language: {language} | Voice: {voice}")
         print(f"Script ({len(script_text.split())} words):\n{script_text}\n")
 
+        # 1b. Editorial pass (hook/SEO/thumbnail/retention agents) — opt-in
+        # via config["use_editorial_agents"]. Runs after the script has
+        # already passed quality_gate's science fact-check. Every field
+        # falls back to the original value if its agent call fails.
+        editorial_title = result["title"]
+        extra_tags, extra_hashtags, thumbnail_override_text = [], [], None
+        if not is_kids_channel:
+            from src.editorial_pass import run_editorial_pass
+            edit_result = run_editorial_pass(topic, script_text, editorial_title, config)
+            script_text = edit_result["script"]
+            editorial_title = edit_result["title"]
+            extra_tags = edit_result["extra_tags"]
+            extra_hashtags = edit_result["extra_hashtags"]
+            thumbnail_override_text = edit_result["thumbnail_text"]
+
         # 2. TTS
         audio_path = tmp / "audio.mp3"
         timing_path = tmp / "timing.json"
@@ -219,20 +234,40 @@ def run(channel_id: str, is_short: bool, privacy_status: str = "public",
         # 5. Thumbnail — best-effort; a failure here never blocks the upload
         thumb_path = tmp / "thumbnail.jpg"
         thumbnail_result = generate_thumbnail(
-            str(output_path), result["title"], str(thumb_path),
+            str(output_path), editorial_title, str(thumb_path),
             language=language, portrait=is_short,
+            override_text=thumbnail_override_text,
         )
 
+        # 5b. QA gate — catches silent assembly bugs (truncated audio,
+        # dead-silent voiceover) before they ever reach an upload. A fatal
+        # issue here raises, which the scheduler already treats like any
+        # other pipeline failure -- the slot isn't marked done, so it
+        # retries next tick instead of publishing a broken video.
+        from src.qa_check import validate_video
+        ok, fatal_issues, qa_warnings = validate_video(
+            str(output_path), str(audio_path),
+            str(thumb_path) if thumbnail_result else None,
+        )
+        for w in qa_warnings:
+            print(f"QA WARNING: {w}")
+        if not ok:
+            issues_text = "; ".join(fatal_issues)
+            raise RuntimeError(f"QA check failed, blocking upload: {issues_text}")
+        print("QA check passed.")
+
         # 6. Upload
-        title = make_title(result["title"], is_short)
+        title = make_title(editorial_title, is_short)
         description = build_description(
-            result["title"], script_text, topic, config["tags"], is_short,
+            editorial_title, script_text, topic,
+            config["tags"] + extra_tags, is_short,
         )
         # Widen the YouTube tag field too (separate from in-description
         # hashtags) -- channel tags plus topic-specific keywords pulled
         # from the title, for better search matching per video.
         video_tags = list(dict.fromkeys(
-            config["tags"] + _extract_hashtags_from_title(result["title"], max_tags=6)
+            config["tags"] + extra_tags + extra_hashtags
+            + _extract_hashtags_from_title(editorial_title, max_tags=6)
         ))
         token_path = ROOT / "tokens" / f"{channel_id}_token.pickle"
 
@@ -244,6 +279,21 @@ def run(channel_id: str, is_short: bool, privacy_status: str = "public",
             made_for_kids=config.get("made_for_kids", False),
         )
         print(f"Uploaded: https://youtube.com/watch?v={video_id}")
+
+        # Log to the video registry -- this is the real-history data the
+        # ceo_agent (channel strategy agent) reads later. Best-effort:
+        # a logging failure should never undo a successful upload.
+        try:
+            from src.agents.video_registry import record_video
+            record_video(channel_id, {
+                "video_id": video_id,
+                "topic": topic,
+                "title": title,
+                "is_short": is_short,
+                "language": language,
+            })
+        except Exception as e:
+            print(f"WARNING: video_registry logging failed ({e}) -- upload itself succeeded.")
 
 
 if __name__ == "__main__":

@@ -21,6 +21,7 @@ from pathlib import Path
 import yaml
 
 from src.trend_scout import get_trending_topic
+from src.daily_brain_topics import get_daily_brain_topic
 
 
 # ---------------------------------------------------------------------------
@@ -760,7 +761,12 @@ def generate_script(
     else:
 
         topic = (
-            get_trending_topic(
+            get_daily_brain_topic(
+                channel_id,
+                config,
+                is_short,
+            )
+            or get_trending_topic(
                 channel_id,
                 config,
             )
