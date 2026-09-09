@@ -34,8 +34,13 @@ def get_authenticated_service(token_path: str, client_secret_path: str = None):
 
     if not creds or not creds.valid:
         if creds and creds.expired and creds.refresh_token:
-            creds.refresh(Request())
-        else:
+            try:
+                creds.refresh(Request())
+            except Exception as e:
+                print(f"WARNING: stored token could not be refreshed ({e}); "
+                      f"falling back to interactive login.")
+                creds = None
+        if not creds:
             if not client_secret_path:
                 raise RuntimeError(
                     f"No valid token at {token_path} and no client_secret "
