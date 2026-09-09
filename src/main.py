@@ -114,6 +114,21 @@ def run(channel_id: str, is_short: bool, privacy_status: str = "public",
     is_kids_channel = config.get("visual_style") == "puppet_animation"
     print(f"=== Running {config['display_name']} | {'SHORT' if is_short else 'LONG-FORM'} ===")
 
+    # Pre-flight auth check -- fails fast (~1 second) if the YouTube
+    # token is dead, instead of discovering it after a full 10-17 minute
+    # generation cycle (script, TTS, footage, assembly) only to fail at
+    # the very last step. Skipped in dry runs since nothing gets
+    # uploaded anyway.
+    if not dry_run:
+        from src.upload_youtube import verify_token_valid
+        token_path = ROOT / "tokens" / f"{channel_id}_token.pickle"
+        client_secret_path = ROOT / "client_secret.json"
+        verify_token_valid(
+            str(token_path),
+            str(client_secret_path) if client_secret_path.exists() else None,
+        )
+        print("Pre-flight auth check passed.")
+
     with tempfile.TemporaryDirectory() as tmp:
         tmp = Path(tmp)
 

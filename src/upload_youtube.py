@@ -57,6 +57,41 @@ def get_authenticated_service(token_path: str, client_secret_path: str = None):
     return build("youtube", "v3", credentials=creds)
 
 
+def verify_token_valid(token_path: str, client_secret_path: str = None) -> None:
+    """Fast pre-flight auth check -- call this BEFORE any expensive
+    Gemini/TTS/Pexels work, not just right before the upload call.
+
+    Forces a genuine token refresh (regardless of whether the access
+    token looks locally unexpired) -- this is the exact same operation
+    that fails with invalid_grant if the refresh token was revoked, and
+    unlike calling a YouTube API endpoint, refreshing needs no particular
+    API scope, so it can't fail on a scope mismatch the way an unrelated
+    read call could.
+
+    Raises RuntimeError with a clear message on any failure."""
+    token_path = Path(token_path)
+    if not token_path.exists():
+        raise RuntimeError(
+            f"No token file at {token_path}. Run this script locally "
+            f"first to generate one (see README)."
+        )
+    with open(token_path, "rb") as f:
+        creds = pickle.load(f)
+    if not creds or not creds.refresh_token:
+        raise RuntimeError(
+            f"Token at {token_path} has no refresh_token -- regenerate "
+            f"it locally (see README)."
+        )
+    try:
+        creds.refresh(Request())
+    except Exception as e:
+        raise RuntimeError(
+            f"Pre-flight auth check failed for token {token_path}: {e}. "
+            f"The token is likely revoked/expired -- regenerate it "
+            f"locally (see README) and update the corresponding "
+            f"GitHub secret."
+        )
+
 def upload_video(
     video_path: str,
     title: str,
