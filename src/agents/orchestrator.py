@@ -104,15 +104,28 @@ def generate_json(
     max_output_tokens: int = 2500,
     model: str | None = None,
 ) -> Any:
-    """Generate and parse JSON through the shared gateway."""
-    return _extract_json(
-        generate_text(
-            prompt,
-            max_output_tokens=max_output_tokens,
-            model=model,
-        )
-    )
+    """Generate and parse JSON through the shared gateway.
 
+    Retries on a JSON parse/truncation failure (separate from
+    generate_text's own rate-limit retry) -- a response cut off mid-array
+    because it ran out of token budget is fixed by asking again with more
+    budget, not by retrying the exact same call. Without this, a single
+    truncated response on a big batch (e.g. scoring 30 candidates at
+    once) failed immediately with zero recovery attempt."""
+    budget = max_output_tokens
+    last_error = None
+    for attempt in range(3):
+        try:
+            return _extract_json(
+                generate_text(prompt, max_output_tokens=budget, model=model)
+            )
+        except ValueError as e:
+            last_error = e
+            budget = int(budget * 1.6)
+            print(f"AI Gateway: JSON parse failed (likely truncated), "
+                  f"retrying with max_output_tokens={budget} "
+                  f"(attempt {attempt + 1}/3)...")
+    raise last_error
 
 def run_agent(name: str, role: str, task: str, context: str = "") -> str:
     """Backward-compatible single-agent text call.

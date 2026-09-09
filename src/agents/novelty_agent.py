@@ -21,10 +21,15 @@ Return JSON object:
       "verdict": "PASS" or "REJECT",
       "novelty_score": 1,
       "similar_previous_topic": "... or empty",
-      "reason": "short reason"
+      "reason": "max 6 words"
     }}
   ]
 }}
+
+Keep "reason" and "similar_previous_topic" extremely short (a few words
+each, not full sentences) -- this batch covers up to 30 candidates at
+once, and verbose reasoning per item risks the response getting cut off
+before the JSON array is complete.
 
 Reject the same idea even if the wording changes. Related subjects are OK
 only when the scientific question and viewer payoff are genuinely different.
@@ -36,6 +41,6 @@ CANDIDATES:
 {candidate_text}
 """,
         f"CHANNEL ID: {channel_id}",
-        max_output_tokens=3500,
+        max_output_tokens=6000,
     )
     return result.get("results", []) if isinstance(result, dict) else []
