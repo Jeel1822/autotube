@@ -3,7 +3,8 @@
 from src.agents.orchestrator import run_json_batch
 
 
-def select_winners(finalists: list[dict], config: dict, count: int = 5) -> dict:
+def select_winners(finalists: list[dict], config: dict, count: int = 5,
+                    performance_summary: str = None) -> dict:
     packed = "\n\n".join(
         f"INDEX: {i+1}\nTOPIC: {x['topic']}\n"
         f"CURIOSITY: {x.get('curiosity', 0)}\n"
@@ -14,6 +15,17 @@ def select_winners(finalists: list[dict], config: dict, count: int = 5) -> dict:
         f"SCIENCE NOTE: {x.get('safe_framing', '')}"
         for i, x in enumerate(finalists)
     )
+
+    performance_block = ""
+    if performance_summary:
+        performance_block = f"""
+
+REAL CHANNEL PERFORMANCE DATA (use this to inform your ranking -- prefer
+candidates that resemble the style/subject/angle of what has genuinely
+performed well on THIS channel before, and be more cautious about
+patterns resembling what has underperformed):
+{performance_summary}
+"""
 
     return run_json_batch(
         "Chief Editor",
@@ -27,7 +39,7 @@ for above -- curiosity, novelty, visual, science confidence):
 - novelty 25%
 - visual potential 20%
 - science confidence 20%
-
+{performance_block}
 SCORING RULES (read carefully -- this matters):
 - "score" must be an integer from 1 to 100.
 - Scores MUST reflect genuine relative differences between candidates.

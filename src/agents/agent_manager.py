@@ -17,6 +17,7 @@ from src.agents.production_agent import build_brief
 from src.agents.science_agent import fact_check_topics
 from src.agents.topic_agent import find_topics
 from src.trend_scout import _fetch_reddit_trending, _fetch_youtube_trending
+from src.channel_analytics import build_performance_summary
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -118,7 +119,19 @@ def run_daily_brain(channel_id: str) -> dict:
         raise RuntimeError("No topic survived scientific screening.")
 
     print("\nSTEP 4 — CHIEF EDITOR")
-    editorial = select_winners(science_pass, config, count=5)
+    token_path = ROOT / "tokens" / f"{channel_id}_analytics_token.pickle"
+    client_secret_path = ROOT / "client_secret.json"
+    performance_summary = None
+    try:
+        performance_summary = build_performance_summary(
+            channel_id, str(token_path),
+            str(client_secret_path) if client_secret_path.exists() else None,
+        )
+    except Exception as e:
+        print(f"WARNING: performance summary unavailable ({e}); "
+              f"ranking without it.")
+    editorial = select_winners(science_pass, config, count=5,
+                                performance_summary=performance_summary)
     winners = editorial.get("winners", []) if isinstance(editorial, dict) else []
     winner = editorial.get("winner") if isinstance(editorial, dict) else None
 
