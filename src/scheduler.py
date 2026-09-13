@@ -3,10 +3,9 @@ scheduler.py
 Runs hourly (triggered by GitHub Actions cron). For each ENABLED channel,
 checks whether each configured upload slot is due *and hasn't already run
 today*, then runs main.py for exactly what's due — 1 long-form video at
-its scheduled hour, and up to 1 short at each of its 5 scheduled hours.
-
-This keeps the total at exactly 1 long + 5 shorts per channel per day,
-regardless of how often the cron itself fires.
+its scheduled hour (optionally gated to every N days via
+config["longform_interval_days"]), and up to 1 short at each of its
+scheduled short hours.
 
 Why "due" isn't just "current hour == slot hour": GitHub's cron can be
 delayed or occasionally drop a tick entirely during high load — an exact
@@ -74,6 +73,47 @@ def _mark_slot_done(channel_id: str, state: dict, slot_id: str) -> None:
     _state_path(channel_id).write_text(json.dumps(state))
 
 
+def _longform_last_run_path(channel_id: str) -> Path:
+    """Separate from the daily schedule_state (which intentionally resets
+    every day) -- this tracks the last date long-form actually succeeded,
+    persisting ACROSS day boundaries, since that's what an every-N-days
+    gate needs to check."""
+    return STATE_DIR / f"{channel_id}_longform_last_run.json"
+
+
+def _is_longform_day(channel_id: str, config: dict, today: str) -> bool:
+    """True if long-form is allowed to run today. Daily (interval=1) by
+    default for backward compatibility -- channels that don't set
+    longform_interval_days behave exactly as before. With interval=2
+    ("every other day"), skips today if it last succeeded yesterday (or
+    today already, though the daily done_slots check handles that case
+    too), and runs if 2+ days have passed or it's never run before."""
+    interval_days = config.get("longform_interval_days", 1)
+    if interval_days <= 1:
+        return True
+
+    path = _longform_last_run_path(channel_id)
+    if not path.exists():
+        return True  # never run before -- always eligible
+    try:
+        last_date_str = json.loads(path.read_text()).get("date")
+    except (json.JSONDecodeError, OSError):
+        return True  # corrupt state -- fail open rather than silently skip forever
+
+    if not last_date_str:
+        return True
+
+    last_date = datetime.strptime(last_date_str, "%Y-%m-%d").date()
+    today_date = datetime.strptime(today, "%Y-%m-%d").date()
+    days_since = (today_date - last_date).days
+    return days_since >= interval_days
+
+
+def _mark_longform_ran(channel_id: str, today: str) -> None:
+    STATE_DIR.mkdir(parents=True, exist_ok=True)
+    _longform_last_run_path(channel_id).write_text(json.dumps({"date": today}))
+
+
 def _enabled_channel_ids() -> set | None:
     """Returns None if all channels are enabled, else a set of allowed ids."""
     raw = os.environ.get("ENABLED_CHANNELS", "").strip()
@@ -103,7 +143,8 @@ def main():
         jobs_due = []  # list of (slot_id, is_short)
         long_slot_id = f"long:{config['upload_time_utc']}"
         if (long_slot_id not in done_slots
-                and _time_to_minutes(config["upload_time_utc"]) <= now_minutes):
+                and _time_to_minutes(config["upload_time_utc"]) <= now_minutes
+                and _is_longform_day(channel_id, config, today)):
             jobs_due.append((long_slot_id, False))
 
         for t in config["shorts_upload_times_utc"]:
@@ -129,6 +170,8 @@ def main():
                 continue
 
             _mark_slot_done(channel_id, state, slot_id)
+            if not is_short:
+                _mark_longform_ran(channel_id, today)
 
     if not ran_any:
         print(f"Nothing due at {now.strftime('%H:%M')} UTC. Nothing to do.")
