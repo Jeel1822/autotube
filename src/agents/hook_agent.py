@@ -9,35 +9,39 @@ def generate_hooks(topic: str, script: str, count: int = 8) -> list[dict]:
 TOPIC: {topic}
 SCRIPT: {script}
 
-REQUIRED FRAMING (this is not optional style preference -- it is backed
-by real view data from this exact channel): every hook MUST directly
-address the viewer using "you"/"your", either by describing something
-physically happening TO them, or by opening with a concrete "what if
-you were standing there" scenario they can picture themselves inside.
+REQUIRED PRINCIPLE (backed by real view/retention data from this exact
+channel -- not a style preference): the opening sentence MUST state the
+single most concrete, jaw-dropping claim of the whole video immediately,
+with ZERO scene-setting, teasing, or wind-up. Either direct "you/your"
+framing or a bold third-person claim works -- what matters is stating
+the actual payoff in sentence one, not building up to it.
 
-Hooks that instead open by describing a distant object in the third
-person ("Mercury bakes...", "Saturn's rings are...", "Massive galaxy
-clusters...") have consistently landed at 0-8 views on this channel.
-Hooks using direct "you/your" framing or a personal "what if" scenario
-have landed at 500-1,100+ views on the exact same channel, same
-production quality, same topics -- the ONLY consistent difference is
-this framing choice in the first sentence.
+Real top performers on this channel (all state the core claim
+immediately, no wind-up):
+- "Saturn has a hurricane wider than two Earths shaped like a perfect
+  hexagon" (third-person, immediate claim -- 1,044 views)
+- "This galaxy is the size of the Milky Way, but it's missing almost
+  all of its stars" (third-person, immediate claim -- 1,019 views, 102%
+  retention)
+- "If you spoke on Saturn's moon Titan, your voice would suddenly
+  drop..." (second-person, immediate claim -- 1,186 views, 120%
+  retention)
 
-Good examples (real, from this channel's top performers):
-- "If you spoke on Saturn's moon Titan, your voice would suddenly drop..."
-- "What if a twin of Earth has been hiding directly behind the Sun this whole time?"
-- "...happening inside your own eyeball" (opening on a bodily/physical effect)
+Real failures on this channel (these scene-set or tease instead of
+stating the claim -- do not do this):
+- "Ten kilometers beneath Jupiter's icy crust..." (scene-setting before
+  the payoff -- 0 views)
+- "Zoom in closer, and you will spot something bizarre" (a TEASE --
+  promises something interesting instead of just saying it -- 11%
+  retention, viewers bailed almost immediately)
+- "How do you find a ghost planet drifting through the galactic bulge?"
+  (a question instead of a claim -- makes the viewer wait for the
+  answer instead of hooking them with it)
 
-Bad examples (real, from this channel's 0-view videos -- do not do this):
-- "Ten kilometers beneath Jupiter's icy crust..."
-- "Mercury bakes under extreme heat..."
-- "Massive galaxy clusters dominate the cosmos..."
-
-Every single hook you generate must pass this test: does it put the
-viewer inside the scenario in the first sentence, using "you" or "your"
-or a "what if you..." framing? If a hook describes an object/place
-without ever addressing the viewer directly, rewrite it before
-including it.
+Every hook you generate must pass this test: if you removed everything
+after the first sentence, would that sentence alone already be a
+complete, concrete, surprising claim? If it's a tease, a question, or a
+scene description building toward the claim, rewrite it.
 
 Return {{"hooks":[{{"hook":"...","clarity":1,"curiosity":1,"retention":1,"science_safety":1}}]}}.''',
         max_output_tokens=1800,
