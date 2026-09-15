@@ -527,7 +527,15 @@ def generate_with_gemini(
     elif length_seconds <= 55:
         words_target = 135
     else:
-        words_target = 150
+        # Scale properly for real long-form durations instead of capping
+        # at a Short-sized word count -- ~140 words/minute is a
+        # reasonable narrated pace (accounts for natural pauses and the
+        # slight pacing slowdown applied in tts.py). Without this
+        # scaling, EVERY long-form video was getting the same ~150-word
+        # target regardless of video_length_seconds -- confirmed by
+        # real published videos consistently landing at ~100-150 words
+        # even when video_length_seconds was set to 300 (5 minutes).
+        words_target = round(length_seconds / 60 * 140)
 
     language_name = LANGUAGE_NAMES.get(
         language,

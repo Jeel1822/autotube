@@ -137,7 +137,7 @@ def _word_count(text: str) -> int:
     )
 
 
-def _basic_script_checks(script: str) -> list:
+def _basic_script_checks(script: str, target_words: int = 150) -> list:
     """
     Cheap deterministic checks before spending another Gemini call.
 
@@ -168,14 +168,24 @@ def _basic_script_checks(script: str) -> list:
 
     words = _word_count(script)
 
-    if words < 70:
+    # Tolerance band around the actual target length instead of a
+    # hardcoded Short-sized 70-150 range -- this was silently rejecting
+    # every genuine long-form script (e.g. a 371-word 5-minute script)
+    # by judging it against Short-length bounds it was never supposed
+    # to meet, regardless of what target_words was actually passed in.
+    min_words = round(target_words * 0.6)
+    max_words = round(target_words * 1.5)
+
+    if words < min_words:
         problems.append(
-            f"Only {words} words; too short for the intended Short."
+            f"Only {words} words; too short for the target of "
+            f"~{target_words} words."
         )
 
-    if words > 150:
+    if words > max_words:
         problems.append(
-            f"{words} words; too long for the intended Short."
+            f"{words} words; too long for the target of "
+            f"~{target_words} words."
         )
 
     # ------------------------------------------------------------
@@ -287,13 +297,14 @@ def check_script(
     topic: str,
     script: str,
     config: dict,
+    target_words: int = 150,
 ) -> dict:
     """
     Ask Gemini to perform a strict scientific/editorial audit.
     """
 
     basic_problems = _basic_script_checks(
-        script
+        script, target_words
     )
 
     client = _client()
@@ -974,6 +985,7 @@ def validate_and_repair(
                 topic,
                 current_script,
                 config,
+                target_words,
             )
         except Exception as e:
 
