@@ -173,7 +173,7 @@ def _basic_script_checks(script: str, target_words: int = 150) -> list:
     # every genuine long-form script (e.g. a 371-word 5-minute script)
     # by judging it against Short-length bounds it was never supposed
     # to meet, regardless of what target_words was actually passed in.
-    min_words = round(target_words * 0.6)
+    min_words = round(target_words * 0.8)
     max_words = round(target_words * 1.5)
 
     if words < min_words:
