@@ -95,9 +95,15 @@ def get_daily_brain_topic(channel_id: str, config: dict, is_short: bool) -> str:
         progress["long_form_used"] = True
         topic = winners[0].get("topic")
     else:
-        index = (progress["shorts_used"] + 1) % len(winners)  # +1 to skip the long-form's winner[0] when possible
+        index = progress["shorts_used"] + 1  # +1 to skip the long-form's winner[0]
         if len(winners) == 1:
             index = 0
+        elif index >= len(winners):
+    # Ran out of unique ranked winners for today -- fall through to
+    # Trend Scout / static topics rather than silently repeating an
+    # earlier slot's exact topic (which is what caused same-day
+    # duplicate uploads once Shorts count exceeded winner count).
+            return None
         topic = winners[index].get("topic")
         progress["shorts_used"] += 1
 

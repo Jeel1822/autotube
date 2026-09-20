@@ -130,7 +130,7 @@ def run_daily_brain(channel_id: str) -> dict:
     except Exception as e:
         print(f"WARNING: performance summary unavailable ({e}); "
               f"ranking without it.")
-    editorial = select_winners(science_pass, config, count=5,
+    editorial = select_winners(science_pass, config, count=9,
                                 performance_summary=performance_summary)
     winners = editorial.get("winners", []) if isinstance(editorial, dict) else []
     winner = editorial.get("winner") if isinstance(editorial, dict) else None
