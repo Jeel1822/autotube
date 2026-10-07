@@ -86,10 +86,23 @@ def assemble_video(
     timing_path: str,
     output_path: str,
     portrait: bool = False,
+    clip_durations: list | None = None,
 ) -> None:
     width, height = PORTRAIT if portrait else LANDSCAPE
     audio_duration = _get_audio_duration(audio_path)
     per_clip_duration = max(audio_duration / max(len(clip_paths), 1), 1.0)
+
+    # Per-beat timing: when the caller supplies one duration per clip
+    # (matched to the narration), use those instead of an even split, and
+    # stretch the final clip so the picture always covers the whole audio
+    # (the final mux uses -shortest, so a short video would cut the voice).
+    if clip_durations and len(clip_durations) == len(clip_paths):
+        durations = [max(float(d), 0.5) for d in clip_durations]
+        shortfall = audio_duration + 0.3 - sum(durations)
+        if shortfall > 0:
+            durations[-1] += shortfall
+    else:
+        durations = [per_clip_duration] * len(clip_paths)
 
     with tempfile.TemporaryDirectory() as tmp:
         tmp = Path(tmp)
@@ -110,7 +123,7 @@ def assemble_video(
                 # cutting the script off mid-sentence with no error or
                 # warning anywhere in the pipeline.
                 "ffmpeg", "-y", "-stream_loop", "-1", "-i", clip,
-                "-t", str(per_clip_duration),
+                "-t", f"{durations[i]:.3f}",
                 "-vf", f"scale={width}:{height}:force_original_aspect_ratio=increase,"
                        f"crop={width}:{height},fps=30",
                 "-an", str(norm_path),

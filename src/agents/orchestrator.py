@@ -75,6 +75,7 @@ def generate_text(
     *,
     max_output_tokens: int = 2500,
     model: str | None = None,
+    json_mode: bool = False,
 ) -> str:
     """Central Gemini gateway with bounded backoff for 429s."""
     for attempt in range(MAX_RETRIES + 1):
@@ -83,6 +84,7 @@ def generate_text(
                 prompt,
                 max_output_tokens=max_output_tokens,
                 model=model or "gemini-3.5-flash-lite",
+                json_mode=json_mode,
             )
         except Exception as exc:
             if not _looks_like_rate_limit(exc) or attempt >= MAX_RETRIES:
@@ -117,11 +119,16 @@ def generate_json(
     for attempt in range(3):
         try:
             return _extract_json(
-                generate_text(prompt, max_output_tokens=budget, model=model)
+                generate_text(prompt, max_output_tokens=budget, model=model,
+                              json_mode=True)
             )
         except ValueError as e:
             last_error = e
-            budget = int(budget * 1.6)
+            # Only raise the budget after the first retry: a corrupted key
+            # (not truncation) is fixed by simply asking again, and a bigger
+            # budget can't repair it.
+            if attempt >= 1:
+                budget = int(budget * 1.6)
             print(f"AI Gateway: JSON parse failed (likely truncated), "
                   f"retrying with max_output_tokens={budget} "
                   f"(attempt {attempt + 1}/3)...")

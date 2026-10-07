@@ -24,8 +24,13 @@ def generate(
     prompt: str,
     max_output_tokens: int | None = None,
     model: str = GEMINI_MODEL,
+    json_mode: bool = False,
 ) -> str:
-    """Generate text using Gemini chat."""
+    """Generate text using Gemini chat.
+
+    json_mode=True asks Gemini for syntactically valid JSON output
+    (response_mime_type), which prevents corrupted keys like s"afe_framing".
+    """
 
     client = get_client()
 
@@ -33,10 +38,13 @@ def generate(
 
     config = None
 
-    if max_output_tokens:
-        config = types.GenerateContentConfig(
-            max_output_tokens=max_output_tokens
-        )
+    if max_output_tokens or json_mode:
+        kwargs = {}
+        if max_output_tokens:
+            kwargs["max_output_tokens"] = max_output_tokens
+        if json_mode:
+            kwargs["response_mime_type"] = "application/json"
+        config = types.GenerateContentConfig(**kwargs)
 
     if config:
         response = chat.send_message(

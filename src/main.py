@@ -227,15 +227,35 @@ def run(channel_id: str, is_short: bool, privacy_status: str = "public",
             # Stock footage search query stays in English (topic is always
             # the internal English working title, regardless of script
             # language) since stock footage libraries index best in English.
-            clip_count = 3 if is_short else 8
             clips_dir = tmp / "clips"
-            clip_paths = fetch_clips_for_topic(
-                topic, str(clips_dir), count=clip_count,
-                orientation="portrait" if is_short else "landscape",
-            )
+            orientation = "portrait" if is_short else "landscape"
+            clip_durations = None
+            try:
+                # Per-sentence visuals: one clip matched to each beat of
+                # the narration, cut to that beat's timing.
+                from src.visual_plan import build_beats, plan_queries
+                from src.fetch_stock import fetch_clips_for_beats
+                beats = build_beats(
+                    str(timing_path),
+                    min_seconds=2.0 if is_short else 5.0,
+                    max_seconds=4.5 if is_short else 9.0,
+                )
+                beats = plan_queries(beats, topic, config.get("niche", "science and space facts"))
+                clip_paths, clip_durations = fetch_clips_for_beats(
+                    beats, str(clips_dir), orientation=orientation, topic=topic,
+                    used_ids_path=ROOT / "state" / f"{channel_id}_used_clips.json",
+                )
+            except Exception as e:
+                print(f"WARNING: per-beat footage failed ({e}); "
+                      f"falling back to topic-level footage.")
+                clip_paths = fetch_clips_for_topic(
+                    topic, str(clips_dir), count=3 if is_short else 8,
+                    orientation=orientation,
+                )
             print(f"Downloaded {len(clip_paths)} clips")
             assemble_video(clip_paths, str(audio_path), str(timing_path),
-                            str(output_path), portrait=is_short)
+                            str(output_path), portrait=is_short,
+                            clip_durations=clip_durations)
         print(f"Assembled video: {output_path} ({output_path.stat().st_size / 1e6:.1f} MB)")
 
         if dry_run:

@@ -480,6 +480,175 @@ def fetch_clips_for_topic(
     return downloaded
 
 
+GENERIC_FALLBACKS = [
+    "space astronomy",
+    "deep space",
+    "stars universe",
+    "nebula",
+]
+
+
+def _load_used_ids(path) -> list:
+    import json
+
+    try:
+        return list(json.loads(Path(path).read_text()))
+    except Exception:
+        return []
+
+
+def _save_used_ids(path, ids: list, keep: int = 600) -> None:
+    import json
+
+    try:
+        Path(path).parent.mkdir(parents=True, exist_ok=True)
+        Path(path).write_text(json.dumps(ids[-keep:]))
+    except OSError as e:
+        print(f"WARNING: could not save used-clip history ({e})")
+
+
+def _slug_overlap(video: dict, query: str) -> int:
+    """
+    Pexels video URLs end in a descriptive slug such as
+    /video/a-clock-hanging-on-a-wall-3045163/. Counting query words that
+    appear in it is a cheap relevance signal Pexels otherwise doesn't give.
+    """
+    slug = (video.get("url") or "").lower()
+    return sum(
+        1 for word in re.findall(r"[a-z]+", query.lower())
+        if len(word) >= 3 and word in slug
+    )
+
+
+def _pick_for_beat(candidates: list, query: str, orientation: str,
+                   blocked: set, min_seconds: float):
+    """
+    Choose one unused clip from Pexels results (which arrive in Pexels'
+    own relevance order). Prefer slug matches, then clips long enough to
+    cover the beat without looping, then Pexels' original ranking.
+    """
+    best, best_key = None, None
+    for rank, video in enumerate(candidates):
+        vid = video.get("id")
+        if not vid or vid in blocked:
+            continue
+        if _score_video(video, orientation) < 5:  # wrong orientation / tiny
+            continue
+        long_enough = 1 if (video.get("duration") or 0) >= min_seconds else 0
+        key = (_slug_overlap(video, query), long_enough, -rank)
+        if best_key is None or key > best_key:
+            best, best_key = video, key
+    return best
+
+
+def _download_clip(video: dict, clip_path: Path) -> bool:
+    target = _choose_video_file(video)
+    url = target.get("link") if target else None
+    if not url:
+        return False
+    try:
+        with requests.get(url, stream=True, timeout=60) as response:
+            response.raise_for_status()
+            with open(clip_path, "wb") as f:
+                for chunk in response.iter_content(chunk_size=1024 * 64):
+                    if chunk:
+                        f.write(chunk)
+        return clip_path.exists() and clip_path.stat().st_size > 10000
+    except Exception as e:  # noqa: BLE001
+        print(f"WARNING: failed downloading Pexels clip ({e})")
+        try:
+            clip_path.unlink()
+        except OSError:
+            pass
+        return False
+
+
+def fetch_clips_for_beats(
+    beats: list,
+    out_dir: str,
+    orientation: str = "portrait",
+    topic: str = "",
+    used_ids_path=None,
+):
+    """
+    Download one clip per beat, matched to that beat's own search query.
+
+    `beats` must already carry "query"/"fallback" keys (see
+    visual_plan.plan_queries). Returns (clip_paths, clip_durations) with
+    one entry per beat, in order, ready for assemble_video(). A beat that
+    cannot be filled reuses the previous clip rather than failing the
+    whole build; if NOTHING could be fetched this raises, so the caller
+    can fall back to the old topic-level fetch.
+    """
+    api_key = os.environ.get("PEXELS_API_KEY")
+    if not api_key:
+        raise RuntimeError("PEXELS_API_KEY not set.")
+    headers = {"Authorization": api_key}
+
+    out_dir = Path(out_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    history = _load_used_ids(used_ids_path) if used_ids_path else []
+    blocked = set(history)           # clips used in earlier videos
+    this_video = set()               # clips already used in THIS video
+    search_cache = {}                # query -> results (saves API calls)
+
+    def search(query):
+        if query not in search_cache:
+            try:
+                search_cache[query] = _search_pexels(
+                    query, headers, orientation, per_page=12
+                )
+            except Exception as e:  # noqa: BLE001
+                print(f"WARNING: Pexels search failed for '{query}' ({e})")
+                search_cache[query] = []
+        return search_cache[query]
+
+    paths, durations = [], []
+    for i, beat in enumerate(beats):
+        length = max(beat["end"] - beat["start"], 1.0)
+        queries = list(dict.fromkeys(
+            [beat.get("query", ""), beat.get("fallback", "")]
+            + _build_search_queries(topic)[:2]
+            + GENERIC_FALLBACKS
+        ))
+        chosen = None
+        for query in [q for q in queries if q]:
+            # Fresh footage first; if a niche query is exhausted, allow
+            # clips from earlier videos rather than going off-topic.
+            chosen = _pick_for_beat(
+                search(query), query, orientation,
+                blocked | this_video, length,
+            ) or _pick_for_beat(
+                search(query), query, orientation, this_video, length,
+            )
+            if chosen:
+                break
+
+        clip_path = out_dir / f"clip_{i}.mp4"
+        if chosen and _download_clip(chosen, clip_path):
+            this_video.add(chosen["id"])
+            paths.append(str(clip_path))
+        elif paths:
+            paths.append(paths[-1])  # reuse previous clip, keep timeline intact
+        else:
+            paths.append(None)
+        durations.append(length)
+
+    # Back-fill any leading beats that failed before the first success.
+    first_ok = next((p for p in paths if p), None)
+    if first_ok is None:
+        raise RuntimeError("Could not download any Pexels footage for the beats.")
+    paths = [p or first_ok for p in paths]
+
+    if used_ids_path:
+        _save_used_ids(used_ids_path, history + sorted(this_video))
+
+    print(f"Pexels: {len(set(paths))} distinct clips for {len(beats)} beats "
+          f"({len(search_cache)} searches)")
+    return paths, durations
+
+
 if __name__ == "__main__":
 
     import argparse
