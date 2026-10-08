@@ -43,8 +43,9 @@ use_varied_pacing: true
 trend_subreddit: "space"
 upload_time_utc: "13:30" # long-form upload time
 longform_interval_days: 2 # every other day, not daily
-shorts_upload_times_utc:
-  ["07:30", "09:30", "11:30", "13:30", "15:30", "17:30", "19:30", "21:30"]
+# Reduced from 8/day to 3/day (Oct 2026): volume was outrunning quality and
+# reach had collapsed. Raise again only once Shorts retention is healthy.
+shorts_upload_times_utc: ["07:30", "13:30", "19:30"]
 tags:
   [
     "space facts",

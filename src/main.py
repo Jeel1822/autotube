@@ -57,6 +57,9 @@ _STOPWORDS = {
     "what", "when", "where", "which", "who", "how", "and", "or", "but",
     "of", "in", "on", "at", "to", "for", "with", "your", "you", "it",
     "its", "that", "this", "than", "than", "actually", "really", "just",
+    "happens", "happen", "does", "would", "could", "like", "into", "from",
+    "about", "every", "after", "before", "their", "there", "when", "then",
+    "have", "will", "much", "more", "most", "only", "even", "also",
 }
 
 
@@ -80,32 +83,56 @@ def _extract_hashtags_from_title(title: str, max_tags: int = 4) -> list:
     return tags
 
 
+def _summarize_for_description(title: str, script_text: str, is_short: bool) -> str:
+    """Short, search-friendly description body (2-3 sentences) instead of
+    pasting the whole narration. Gemini writes it; if that fails we fall
+    back to the first sentences of the script."""
+    try:
+        from src.agents.orchestrator import generate_text
+        prompt = f"""Write a YouTube video description body for this {'Short' if is_short else 'video'}.
+
+Title: {title}
+
+Script:
+{script_text[:3500]}
+
+Rules:
+- 2 to 3 sentences, under 280 characters total.
+- Say what the viewer will learn; include the main topic keywords naturally.
+- Plain text only: no hashtags, no emojis, no quotes, no markdown.
+- Do not give away the final payoff. Do not invent facts that aren't in the script.
+Return only the description text."""
+        text = generate_text(prompt, max_output_tokens=300).strip().strip('"')
+        if 40 <= len(text) <= 500:
+            return text
+    except Exception as e:  # noqa: BLE001
+        print(f"WARNING: description summary failed ({e}); using script excerpt.")
+    sentences = re.split(r"(?<=[.!?])\s+", script_text.strip())
+    return " ".join(sentences[:2])[:300]
+
+
 def build_description(title: str, script_text: str, topic: str,
                        channel_tags: list, is_short: bool) -> str:
-    """Builds a fuller, more engaging description than a bare script
-    excerpt: a hook line, the script itself, a subscribe CTA, and a wide
-    hashtag block (channel tags + topic-specific ones extracted from the
-    title) -- more hashtags and keyword coverage generally means more
-    surface area for YouTube search/suggested to match the video against."""
-    hook = f"{title.strip()} \U0001F440"  # eyes emoji -- cheap, universal curiosity cue
+    """Short summary + subscribe CTA + a handful of hashtags.
 
-    extracted = _extract_hashtags_from_title(title)
-    # Channel tags first (consistent branding across every video on the
-    # channel), then topic-specific ones, deduped, capped so the block
-    # doesn't run away in length.
-    all_tag_words = list(dict.fromkeys(channel_tags + extracted))
-    hashtags = " ".join("#" + t.replace(" ", "") for t in all_tag_words[:12])
+    Hashtags: topic-specific ones first (YouTube shows only the first
+    three above the title), then two broad channel ones. Capped at 5
+    (+ #Shorts for Shorts); stuffing a dozen tags dilutes them.
+    """
+    summary = _summarize_for_description(title, script_text, is_short)
+
+    extracted = _extract_hashtags_from_title(title, max_tags=3)
+    broad = ["SpaceFacts", "Astronomy"]
+    tag_words = list(dict.fromkeys(
+        t.replace(" ", "") for t in extracted + broad
+    ))[:5]
+    hashtags = " ".join("#" + t for t in tag_words)
     if is_short:
-        hashtags += " #Shorts #ShortVideo"
+        hashtags += " #Shorts"
 
-    cta = "Subscribe for more mind-bending facts every day! \U0001F680"
+    cta = "Subscribe for more mind-bending space and science facts! \U0001F680"
 
-    return (
-        f"{hook}\n\n"
-        f"{script_text.strip()}\n\n"
-        f"{cta}\n\n"
-        f"{hashtags}"
-    )
+    return f"{title.strip()}\n\n{summary}\n\n{cta}\n\n{hashtags}"
 
 
 def run(channel_id: str, is_short: bool, privacy_status: str = "public",

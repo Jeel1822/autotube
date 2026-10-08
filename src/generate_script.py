@@ -581,6 +581,18 @@ FACTUAL STANDARD:
 - Avoid sensational claims that contradict established science.
 - Do not use physically impossible explanations just to make the story
   sound dramatic.
+- If the topic is theoretical or modeled rather than observed, say so
+  ONCE, clearly, near the start (for example: "Models suggest...").
+  After that, speak confidently about the model. Do not stack hedges such
+  as "could", "might", "theoretically", "hypothetical", or "assuming" --
+  at most one hedge word per paragraph.
+- Do not make claims about the current state or near-future timing of an
+  ongoing phenomenon (for example "in just a few years the Sun's poles will
+  flip") unless the script gives a sourced, specific fact. Prefer timeless
+  statements ("every eleven years") over "right now" or "soon".
+- The opening line must be consistent with the rest of the script: never
+  open with a flat statement of fact that the script then qualifies as
+  hypothetical.
 
 RETENTION STRUCTURE:
 

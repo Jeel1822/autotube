@@ -31,6 +31,25 @@ def _word_count(text: str) -> int:
     return len(re.findall(r"\b[\w'-]+\b", text))
 
 
+_DEDUPE_STOP = {"the", "a", "an", "of", "in", "on", "to", "and", "is", "are", "was",
+                "it", "that", "this", "its", "our", "your", "for", "with", "as",
+                "at", "by", "from", "every", "each", "than", "then", "just"}
+
+
+def _content_words(text: str) -> set:
+    return {w for w in re.findall(r"[a-z]+", text.lower())
+            if len(w) > 2 and w not in _DEDUPE_STOP}
+
+
+def _mostly_repeats(hook: str, sentence: str, threshold: float = 0.5) -> bool:
+    """True when at least `threshold` of the shorter sentence's content
+    words already appear in the other one (overlap coefficient)."""
+    a, b = _content_words(hook), _content_words(sentence)
+    if not a or not b:
+        return False
+    return len(a & b) / min(len(a), len(b)) >= threshold
+
+
 def _apply_retention_pass(topic: str, script: str) -> str:
     from src.agents.retention_agent import review_script
     review = review_script(topic, script)
@@ -71,6 +90,16 @@ def _apply_hook_pass(topic: str, script: str) -> str:
     if not match:
         return script  # single-sentence script -- too risky to touch, skip
     rest_of_script = script[match.end():]
+
+    # The new hook often states the same claim as the sentence right after
+    # it ("Every eleven years, the Sun's field flips..." followed by
+    # "Every eleven years, our star flips its field..."), so the viewer
+    # hears it twice. Drop that next sentence when it mostly repeats the hook.
+    nxt = re.search(r"[.!?]\s+", rest_of_script)
+    if nxt and _mostly_repeats(best_hook, rest_of_script[:nxt.end()]):
+        print("Hook pass: dropped the next sentence because it repeated the new hook.")
+        rest_of_script = rest_of_script[nxt.end():]
+
     print(f"Hook pass: replaced opening with top-scored hook (score={_score(best)}).")
     return f"{best_hook} {rest_of_script}"
 

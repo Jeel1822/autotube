@@ -520,6 +520,27 @@ def _slug_overlap(video: dict, query: str) -> int:
     )
 
 
+# Words in a Pexels clip's URL slug that signal everyday/people footage,
+# which keeps sneaking in through literal word matches (a woman holding a
+# magnet board for "magnetic field lines", a geyser for "eruption", a
+# wind-turbine sunset for "sun rotation"). A clip is skipped when its slug
+# has one of these words and the beat's own query did not ask for it.
+OFF_TOPIC_SLUG_WORDS = {
+    "woman", "women", "man", "men", "girl", "boy", "child", "children", "kid",
+    "kids", "people", "person", "couple", "family", "baby", "student",
+    "businessman", "businesswoman", "model", "smiling", "wedding",
+    "dog", "cat", "bird", "birds", "pigeons", "food", "coffee", "street",
+    "traffic", "city", "car", "cars", "beach", "turbine", "turbines",
+    "geyser", "steam", "waterfall", "sunset", "sunrise", "clouds",
+}
+
+
+def _is_off_topic(video: dict, query: str) -> bool:
+    slug_words = set(re.findall(r"[a-z]+", (video.get("url") or "").lower()))
+    query_words = set(re.findall(r"[a-z]+", query.lower()))
+    return bool((slug_words & OFF_TOPIC_SLUG_WORDS) - query_words)
+
+
 def _pick_for_beat(candidates: list, query: str, orientation: str,
                    blocked: set, min_seconds: float):
     """
@@ -533,6 +554,8 @@ def _pick_for_beat(candidates: list, query: str, orientation: str,
         if not vid or vid in blocked:
             continue
         if _score_video(video, orientation) < 5:  # wrong orientation / tiny
+            continue
+        if _is_off_topic(video, query):
             continue
         long_enough = 1 if (video.get("duration") or 0) >= min_seconds else 0
         key = (_slug_overlap(video, query), long_enough, -rank)

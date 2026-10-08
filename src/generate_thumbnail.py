@@ -58,6 +58,28 @@ def _shorten_for_thumbnail(title: str, language: str, max_words: int = 4) -> str
     return short.upper() if language == "en" else short
 
 
+def _wrap_and_fit(text: str, width: int, base_font: int) -> tuple:
+    """Split text into at most two balanced lines and shrink the font so
+    the longest line fits inside ~84% of the frame width. WrapStyle 2
+    (no auto-wrap) is used in the .ass file, so without this, long text
+    simply ran off the edge of the thumbnail."""
+    words = text.split()
+    if len(words) >= 3:
+        best, best_gap = None, None
+        for i in range(1, len(words)):
+            left, right = " ".join(words[:i]), " ".join(words[i:])
+            gap = abs(len(left) - len(right))
+            if best_gap is None or gap < best_gap:
+                best, best_gap = (left, right), gap
+        lines = list(best)
+    else:
+        lines = [" ".join(words)]
+    longest = max(len(line) for line in lines) or 1
+    # Bold caps in FreeSans average roughly 0.72 em per character.
+    fitted = int((width * 0.84) / (0.72 * longest))
+    return "\\N".join(lines), max(min(base_font, fitted), 28)
+
+
 def _escape_ass_text(text: str) -> str:
     """Escape characters with special meaning inside an .ass Dialogue text field."""
     return text.replace("\\", "\\\\").replace("{", "\\{").replace("}", "\\}")
@@ -65,8 +87,10 @@ def _escape_ass_text(text: str) -> str:
 
 def _write_thumbnail_ass(text: str, ass_path: Path, width: int, height: int,
                           font_size: int, scheme: dict) -> None:
-    escaped = _escape_ass_text(text)
-    margin_v = int(height * 0.12)
+    escaped = "\\N".join(_escape_ass_text(part) for part in text.split("\\N"))
+    # Top-center (Alignment 8): YouTube draws the duration badge in the
+    # bottom-right corner, which was covering bottom-aligned text.
+    margin_v = int(height * 0.07)
     # BorderStyle 3 + a thick Outline draws an opaque colored banner behind
     # the text (using BackColour) rather than a thin outline around it --
     # this is the bold "banner text" look that reads at a glance in a
@@ -80,7 +104,7 @@ ScaledBorderAndShadow: yes
 
 [V4+ Styles]
 Format: Name, Fontname, Fontsize, PrimaryColour, OutlineColour, BackColour, Bold, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
-Style: Default,{FONT_NAME},{font_size},{scheme['text']},&H00000000,{scheme['bg']},1,3,14,0,2,50,50,{margin_v},1
+Style: Default,{FONT_NAME},{font_size},{scheme['text']},&H00000000,{scheme['bg']},1,3,14,0,8,50,50,{margin_v},1
 
 [Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
@@ -168,6 +192,8 @@ def generate_thumbnail(
 
         short_text = override_text or _shorten_for_thumbnail(title, language)
         scheme = random.choice(THUMBNAIL_SCHEMES)
+
+        short_text, font_size = _wrap_and_fit(short_text, width, font_size)
 
         ass_path = Path(output_path).with_suffix(".ass")
         _write_thumbnail_ass(short_text, ass_path, width, height, font_size, scheme)

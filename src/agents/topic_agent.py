@@ -32,6 +32,27 @@ Each item must contain:
 Return JSON object:
 {{"topics": [ ... ]}}
 
+WHAT WORKS ON THIS CHANNEL (from real analytics, last 28 days -- each of
+these got ~1,000+ views):
+- "What sound actually sounds like on Saturn's moon"
+- "The physics of Saturn's hexagon storm"
+- "A galaxy the size of the Milky Way that is missing almost all its stars"
+- "Dying stars plowing through space"
+- "How quantum fluctuations built the cosmic web"
+Pattern: ONE concrete, strange, easy-to-picture claim about a famous
+object (Saturn, black holes, the Sun, Andromeda, the Moon), phrased in
+plain words a non-scientist understands in a single reading.
+
+WHAT FAILS (0-3 views): topics whose key idea is a technical term the
+viewer must already know -- "metal-poor halo stars", "Roche lobe",
+"sublimation of volatiles", "eccentric orbit atmospheres", "metallicity".
+Do not generate topics built around unexplained jargon. If a technical
+idea is genuinely interesting, restate it as a plain-language surprise.
+
+Audience: mostly adults 35+, mostly US, watching on phones. Favor
+size/scale, sound, danger, "what would happen if", and things they can
+relate to Earth or their own body.
+
 Use recent signals as inspiration, not as titles to copy.
 Reject generic facts, listicles, unsupported mysteries, fake NASA claims,
 and recycled ideas.

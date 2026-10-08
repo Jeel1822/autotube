@@ -152,6 +152,15 @@ def main():
             if short_slot_id not in done_slots and _time_to_minutes(t) <= now_minutes:
                 jobs_due.append((short_slot_id, True))
 
+        # Never publish more than one video per channel per hourly tick. After
+        # an outage (expired token, failed run) every missed slot is "due" at
+        # once, and publishing them all back-to-back is a burst of
+        # near-identical uploads. Draining one per tick keeps them spaced.
+        if len(jobs_due) > 1:
+            print(f"{channel_id}: {len(jobs_due)} slots due; running 1 now, "
+                  f"the rest on later ticks.")
+            jobs_due = jobs_due[:1]
+
         for slot_id, is_short in jobs_due:
             ran_any = True
             label = "SHORT" if is_short else "LONG-FORM"

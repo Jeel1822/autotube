@@ -128,6 +128,15 @@ Rules:
 - Prefer science, space, nature, and technology imagery. Avoid queries that
   mostly return unrelated things (street scenes, animals, crowds, food).
 - Do not repeat the same query for neighbouring lines; vary the visuals.
+- Stock search matches literal words, so a bare word like "eruption",
+  "storm", "field" or "lines" returns geysers, weather and people. Always
+  anchor each query with the subject domain ("sun", "space", "star",
+  "galaxy", "planet", "telescope", "laboratory"), e.g. "solar eruption
+  space" and not "solar storm eruption"; "sun plasma" and not "magnetic
+  field lines".
+- Never ask for people, faces, hands, or everyday scenes unless the line is
+  explicitly about the human body; then use a macro shot (for example
+  "human eye macro").
 - No people-identifying terms, no brand names, no text or logo requests.
 
 Return ONLY JSON in exactly this shape, one entry per line, same order:
