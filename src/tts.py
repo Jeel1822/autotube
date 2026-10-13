@@ -1,20 +1,29 @@
-
 """
 tts.py
 
-Converts script text to speech using edge-tts.
+Converts script text to speech using edge-tts, with an Azure Speech
+REST fallback when edge-tts is blocked (e.g. HTTP 403 from CI runners).
 
 Also produces word-level timing data used by:
     - synced captions
     - mascot mouth-flap timing
     - animation timing
 
+ENGINE STRATEGY
+---------------
+1. Try edge-tts (up to EDGE_TTS_ATTEMPTS times, fresh Communicate object
+   each time).
+2. If every attempt fails, fall back to Azure Speech (REST). Requires the
+   AZURE_SPEECH_KEY and AZURE_SPEECH_REGION environment variables.
+   Uses the same neural voice names, so the channel sounds the same.
+
 TIMING STRATEGY
 ---------------
 1. Prefer native WordBoundary events from edge-tts.
 2. Validate the native timing data.
-3. If the voice does not provide usable WordBoundary events, estimate
-   timings from the REAL generated audio duration.
+3. If the voice does not provide usable WordBoundary events (always the
+   case on the Azure REST fallback), estimate timings from the REAL
+   generated audio duration.
 4. Estimated timings are sentence-aware and weighted by word length.
 
 IMPORTANT:
@@ -37,11 +46,14 @@ treated as a fatal error.
 
 import asyncio
 import json
+import os
 import re
 import subprocess
 from pathlib import Path
+from xml.sax.saxutils import escape
 
 import edge_tts
+import requests
 
 
 # ---------------------------------------------------------------------------
@@ -54,6 +66,12 @@ MIN_VALID_BOUNDARIES = 3
 # Native timing coverage must reach at least this percentage of the
 # narration's words before we trust it.
 MIN_BOUNDARY_COVERAGE = 0.70
+
+# How many times to try edge-tts before falling back to Azure.
+EDGE_TTS_ATTEMPTS = 2
+
+# Azure REST output format (mono MP3, compatible with the existing pipeline).
+AZURE_OUTPUT_FORMAT = "audio-24khz-48kbitrate-mono-mp3"
 
 
 # ---------------------------------------------------------------------------
@@ -114,6 +132,9 @@ async def _synthesize(
         voice,
         rate=rate,
         pitch=pitch,
+        # edge-tts 7.x defaults to SentenceBoundary, which this code
+        # ignores. Ask for word-level events explicitly.
+        boundary="WordBoundary",
     )
 
     word_boundaries = []
@@ -184,6 +205,120 @@ async def _synthesize(
                     continue
 
     return word_boundaries
+
+
+async def _synthesize_with_retry(
+    text: str,
+    voice: str,
+    audio_out: Path,
+    rate: str = "+0%",
+    pitch: str = "+0Hz",
+    attempts: int = EDGE_TTS_ATTEMPTS,
+) -> list:
+    """
+    Retry edge-tts, creating a fresh Communicate object on every attempt.
+
+    Handshake 403s (blocked IP, token/clock-skew problems) and transient
+    network errors are retried with a short backoff. The last exception is
+    re-raised so the caller can decide to fall back to another engine.
+    """
+
+    last_exc = None
+
+    for attempt in range(attempts):
+
+        try:
+            return await _synthesize(
+                text=text,
+                voice=voice,
+                audio_out=audio_out,
+                rate=rate,
+                pitch=pitch,
+            )
+
+        except Exception as exc:
+            last_exc = exc
+
+            print(
+                f"WARNING: edge-tts attempt {attempt + 1}/{attempts} "
+                f"failed: {type(exc).__name__}: {exc}"
+            )
+
+            if attempt < attempts - 1:
+                await asyncio.sleep(2 ** attempt)
+
+    raise last_exc
+
+
+# ---------------------------------------------------------------------------
+# Azure Speech fallback
+# ---------------------------------------------------------------------------
+
+def _synthesize_azure(
+    text: str,
+    voice: str,
+    audio_out: Path,
+    rate: str = "+0%",
+    pitch: str = "+0Hz",
+) -> list:
+    """
+    Fallback TTS using the Azure Speech REST API.
+
+    Uses the same neural voice names as edge-tts (e.g. en-US-AndrewNeural).
+
+    The REST API returns no word boundaries, so this returns an empty list.
+    synthesize_speech() then builds estimated timings from the real audio
+    duration, exactly as it does for voices without WordBoundary support.
+    """
+
+    key = os.environ.get("AZURE_SPEECH_KEY", "").strip()
+    region = os.environ.get("AZURE_SPEECH_REGION", "").strip()
+
+    if not key or not region:
+        raise RuntimeError(
+            "Azure fallback unavailable: set the AZURE_SPEECH_KEY and "
+            "AZURE_SPEECH_REGION environment variables."
+        )
+
+    # en-US-AndrewNeural -> en-US
+    lang = "-".join(voice.split("-")[:2])
+
+    ssml = (
+        f"<speak version='1.0' xml:lang='{lang}' "
+        f"xmlns='http://www.w3.org/2001/10/synthesis'>"
+        f"<voice name='{voice}'>"
+        f"<prosody rate='{rate}' pitch='{pitch}'>"
+        f"{escape(text)}"
+        f"</prosody>"
+        f"</voice>"
+        f"</speak>"
+    )
+
+    response = requests.post(
+        f"https://{region}.tts.speech.microsoft.com/cognitiveservices/v1",
+        headers={
+            "Ocp-Apim-Subscription-Key": key,
+            "Content-Type": "application/ssml+xml",
+            "X-Microsoft-OutputFormat": AZURE_OUTPUT_FORMAT,
+            "User-Agent": "autotube",
+        },
+        data=ssml.encode("utf-8"),
+        timeout=60,
+    )
+
+    response.raise_for_status()
+
+    if not response.content:
+        raise RuntimeError("Azure Speech returned an empty audio body.")
+
+    Path(audio_out).write_bytes(response.content)
+
+    print(
+        f"TTS: Azure Speech fallback wrote "
+        f"{len(response.content)} bytes of audio."
+    )
+
+    return []
 
 
 # ---------------------------------------------------------------------------
@@ -605,17 +740,38 @@ def synthesize_speech(
 
     # ---------------------------------------------------------------
     # Generate audio and attempt native WordBoundary metadata.
+    #
+    # edge-tts first (with retries). If it is blocked or down, fall
+    # back to Azure Speech, which returns audio only (no boundaries).
     # ---------------------------------------------------------------
 
-    word_boundaries = asyncio.run(
-        _synthesize(
+    try:
+
+        word_boundaries = asyncio.run(
+            _synthesize_with_retry(
+                text=text,
+                voice=voice,
+                audio_out=audio_out,
+                rate=rate,
+                pitch=pitch,
+            )
+        )
+
+    except Exception as exc:
+
+        print(
+            f"WARNING: edge-tts failed after {EDGE_TTS_ATTEMPTS} "
+            f"attempts ({type(exc).__name__}); "
+            f"falling back to Azure Speech."
+        )
+
+        word_boundaries = _synthesize_azure(
             text=text,
             voice=voice,
             audio_out=audio_out,
             rate=rate,
             pitch=pitch,
         )
-    )
 
     # ---------------------------------------------------------------
     # Confirm the generated audio is valid.
@@ -650,13 +806,13 @@ def synthesize_speech(
     else:
 
         # -----------------------------------------------------------
-        # Native metadata unavailable/unreliable.
+        # Native metadata unavailable/unreliable (always true on the
+        # Azure REST fallback).
         # -----------------------------------------------------------
 
         print(
             f"WARNING: voice '{voice}' returned "
-            f"no reliable WordBoundary events "
-            f"from edge-tts."
+            f"no reliable WordBoundary events."
         )
 
         print(
@@ -733,7 +889,7 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(
         description=(
-            "Generate Edge-TTS narration "
+            "Generate TTS narration "
             "and word timings."
         )
     )
@@ -749,7 +905,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "voice",
         help=(
-            "Edge-TTS voice, e.g. "
+            "Neural voice, e.g. "
             "en-US-AndrewNeural"
         ),
     )
@@ -803,4 +959,3 @@ if __name__ == "__main__":
         f"Wrote {args.audio_out} "
         f"and {args.timing_out}"
     )
-
