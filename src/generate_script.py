@@ -628,31 +628,16 @@ in conclusion
 
 WRITING RULES:
 
-- Conversational spoken language.
-- Short sentences mixed with occasional longer sentences.
-- No academic-paper language.
-- No unnecessary definitions.
-- No filler.
-- No motivational life lessons.
-- No generic phrases such as:
-  "Here's something most people don't know"
-  "It sounds simple"
-  "This reveals a lot about science"
-  "Once you understand"
-  "you'll start noticing"
-  "changes how you see the world"
-  "in the world of science"
-  "the universe is full of mysteries"
-- Do not begin by repeating the topic.
-- Do not use rhetorical filler every few sentences.
-- Every sentence must either create curiosity, explain something,
-  or deliver a payoff.
-- Do not use emojis.
-- Do not use stage directions.
-- Do not use visual notes.
-- Do not use markdown.
-- Do not mention that you are an AI.
-- The narration must sound natural when read by text-to-speech.
+- Conversational spoken language. Speak directly to one person.
+- USE CONTRACTIONS ALWAYS (e.g., "don't," "it's," "you'll," "that's").
+- Use dashes (—) to create natural, thoughtful pauses in the middle of sentences.
+- Mix sentence lengths: one long, descriptive sentence followed by one short, punchy, three-to-five word sentence.
+- Remove all academic or "AI-assistant" language (no "In the world of science," "Interestingly," "It's important to note," "Most people don't know").
+- Never begin with "Have you ever wondered..." or "Imagine...". Start immediately with the core curiosity.
+- No emojis. No stage directions. No visual notes. No markdown.
+- The narration must sound completely natural when read by a human. If a sentence feels awkward to say out loud, delete it.
+- Avoid passive voice. Use strong, active verbs.
+- The tone should be one of genuine awe or curiosity, not a cold lecture.
 
 VISUAL THINKING:
 
@@ -768,6 +753,8 @@ def generate_script(
     channel_id: str,
     is_short: bool = False,
     forced_topic: str = None,
+    dry_run: bool = False,
+    exclude_topics=None,
 ) -> dict:
 
     config = load_channel_config(
@@ -785,6 +772,8 @@ def generate_script(
                 channel_id,
                 config,
                 is_short,
+                dry_run=dry_run,
+                exclude=exclude_topics,
             )
             or get_trending_topic(
                 channel_id,
@@ -796,10 +785,12 @@ def generate_script(
             )
         )
 
-        mark_topic_used(
-            channel_id,
-            topic,
-        )
+        # Dry runs must not consume topics (they'd burn real slots).
+        if not dry_run:
+            mark_topic_used(
+                channel_id,
+                topic,
+            )
 
     language = pick_language(
         config

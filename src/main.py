@@ -23,8 +23,9 @@ import yaml
 
 from src.generate_script import (
     generate_script, generate_kids_script,
-    save_todays_longform_topic, get_recap_topic_for_short,
+    save_todays_longform_topic, get_recap_topic_for_short, mark_topic_used,
 )
+from src.daily_brain_topics import mark_topic_rejected
 from src.quality_gate import validate_and_repair
 from src.tts import synthesize_speech
 from src.fetch_stock import fetch_clips_for_topic
@@ -159,30 +160,40 @@ def run(channel_id: str, is_short: bool, privacy_status: str = "public",
     with tempfile.TemporaryDirectory() as tmp:
         tmp = Path(tmp)
 
-        # 1. Script
-        if is_kids_channel:
-            result = generate_kids_script(channel_id, is_short=is_short)
-        else:
+        # 1. Script (+ Quality Gate)
+        # If the gate rejects a topic after all repairs, the premise itself
+        # is usually the problem (a misleading hook can't be repaired away).
+        # Reject that topic, move to the next ranked one, and try again
+        # instead of failing the whole run.
+        MAX_TOPIC_ATTEMPTS = 3
+        rejected_topics: set = set()
+        forced_topic = None
+        if not is_kids_channel and is_short:
             # For a Short, first check whether today's long-form video
             # already happened and hasn't been "recapped" yet -- if so,
             # reuse that topic instead of picking a fresh unrelated one.
-            # This gives the channel one coherent daily throughline
-            # (long-form + a matching recap Short) instead of 6 fully
-            # disconnected topics per day, which is the standard
-            # repurposing pattern most channels use Shorts for.
-            forced_topic = get_recap_topic_for_short(channel_id) if is_short else None
-            result = generate_script(channel_id, is_short=is_short, forced_topic=forced_topic)
-            if not is_short:
-                # Record today's long-form topic so the next Short run
-                # (this same scheduler tick or a later one) can pick it up.
-                save_todays_longform_topic(channel_id, result["topic"])
-        topic, script_text = result["topic"], result["script"]
-        language, voice = result["language"], result["voice"]
+            forced_topic = get_recap_topic_for_short(channel_id)
 
-        # Quality Gate
-        # Never run this for the kids puppet pipeline yet; it has different
-        # language/content requirements.
-        if not is_kids_channel:
+        for topic_attempt in range(1, MAX_TOPIC_ATTEMPTS + 1):
+            if is_kids_channel:
+                result = generate_kids_script(channel_id, is_short=is_short)
+            else:
+                result = generate_script(
+                    channel_id, is_short=is_short, forced_topic=forced_topic,
+                    dry_run=dry_run, exclude_topics=rejected_topics,
+                )
+                if not is_short and not dry_run:
+                    # Record today's long-form topic so the next Short run
+                    # can pick it up for a recap.
+                    save_todays_longform_topic(channel_id, result["topic"])
+            topic, script_text = result["topic"], result["script"]
+            language, voice = result["language"], result["voice"]
+
+            # Quality Gate (not for the kids puppet pipeline yet; it has
+            # different language/content requirements).
+            if is_kids_channel:
+                break
+
             target_words = int(
                 (config["short_length_seconds"] if is_short
                 else config["video_length_seconds"]) * 2.2
@@ -194,18 +205,37 @@ def run(channel_id: str, is_short: bool, privacy_status: str = "public",
                 config=config,
                 target_words=target_words,
             )
-
             result["script"] = script_text
 
-            print(
-                f"Quality score: "
-                f"{quality_review.get('score', 0):.1f}/10"
-            )
+            print(f"Quality score: {quality_review.get('score', 0):.1f}/10")
 
-            if not quality_review.get("approved"):
+            if quality_review.get("approved"):
+                break
+
+            # A gate that couldn't run (API outage) says nothing about the
+            # topic -- don't blacklist it, just stop.
+            # Gemini failing mid-check says nothing about the topic -- unless
+            # the gate had ALREADY rejected it twice before the outage hit
+            # (a repair loop that can't fix the premise). Then the topic is
+            # clearly the problem, so move on instead of stopping the run.
+            if (quality_review.get("infra_failure")
+                    and quality_review.get("real_rejections", 0) < 2):
                 raise RuntimeError(
-                    "Quality Gate rejected the script after all repair attempts."
+                    "Quality Gate could not run (Gemini unavailable); "
+                    "not rejecting the topic. Re-run later."
                 )
+
+            print(f"Topic rejected by Quality Gate: {topic!r} "
+                  f"(topic attempt {topic_attempt}/{MAX_TOPIC_ATTEMPTS})")
+            rejected_topics.add(topic)
+            forced_topic = None  # a recap topic can't be retried; pick fresh
+            mark_topic_used(channel_id, topic)
+            mark_topic_rejected(channel_id, topic)
+        else:
+            raise RuntimeError(
+                f"Quality Gate rejected {MAX_TOPIC_ATTEMPTS} topics in a row "
+                f"({', '.join(sorted(rejected_topics))})."
+            )
 
         print(f"Topic: {topic}")
         if is_kids_channel:
@@ -291,6 +321,13 @@ def run(channel_id: str, is_short: bool, privacy_status: str = "public",
             dest.parent.mkdir(exist_ok=True)
             dest.write_bytes(output_path.read_bytes())
             print(f"[DRY RUN] Saved to {dest} instead of uploading")
+
+            # Export to multi-platform folders (TikTok, IG Reels, YouTube Shorts)
+            try:
+                from src.export_platforms import export_to_all_platforms
+                export_to_all_platforms(str(dest))
+            except Exception as e:
+                print(f"WARNING: Multi-platform export failed: {e}")
             return
 
         # 5. Thumbnail — best-effort; a failure here never blocks the upload

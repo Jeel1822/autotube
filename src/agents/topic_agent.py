@@ -1,5 +1,6 @@
 """Batch topic generation for Cosmic Curious."""
 
+from src.agents.content_filter import load_playbook, playbook_prompt_block
 from src.agents.orchestrator import run_json_batch
 
 
@@ -12,6 +13,13 @@ def find_topics(
 ) -> list[dict]:
     signals = "\n".join(f"- {x}" for x in trend_signals[:40]) or "(no live signals)"
     used = "\n".join(f"- {x}" for x in used_topics[-150:]) or "(none)"
+    # Real-analytics playbook (channels/<id>_playbook.yaml): what works, what
+    # fails, and the required archetype mix. Edit the YAML, not this file.
+    playbook_block = playbook_prompt_block(load_playbook(channel_id)) or (
+        "Prefer ONE concrete, strange, easy-to-picture claim about a "
+        "familiar object, in plain words a non-scientist understands. "
+        "Avoid topics built on unexplained jargon."
+    )
 
     result = run_json_batch(
         "Topic Hunter",
@@ -21,7 +29,7 @@ Generate exactly {count} candidate topics.
 
 Each item must contain:
 {{
-  "topic": "specific topic or question",
+  "topic": "plain-language title, 4-8 words, never starting with 'How'",
   "curiosity": 1,
   "novelty": 1,
   "visual": 1,
@@ -32,26 +40,13 @@ Each item must contain:
 Return JSON object:
 {{"topics": [ ... ]}}
 
-WHAT WORKS ON THIS CHANNEL (from real analytics, last 28 days -- each of
-these got ~1,000+ views):
-- "What sound actually sounds like on Saturn's moon"
-- "The physics of Saturn's hexagon storm"
-- "A galaxy the size of the Milky Way that is missing almost all its stars"
-- "Dying stars plowing through space"
-- "How quantum fluctuations built the cosmic web"
-Pattern: ONE concrete, strange, easy-to-picture claim about a famous
-object (Saturn, black holes, the Sun, Andromeda, the Moon), phrased in
-plain words a non-scientist understands in a single reading.
-
-WHAT FAILS (0-3 views): topics whose key idea is a technical term the
-viewer must already know -- "metal-poor halo stars", "Roche lobe",
-"sublimation of volatiles", "eccentric orbit atmospheres", "metallicity".
-Do not generate topics built around unexplained jargon. If a technical
-idea is genuinely interesting, restate it as a plain-language surprise.
+{playbook_block}
 
 Audience: mostly adults 35+, mostly US, watching on phones. Favor
-size/scale, sound, danger, "what would happen if", and things they can
-relate to Earth or their own body.
+first-person scenes on a real object, sound, scale, danger, hidden or
+secret objects, and things they can relate to Earth or their own body.
+A famous fact alone is not enough: it needs a strange, concrete
+consequence the viewer can picture in one reading.
 
 Use recent signals as inspiration, not as titles to copy.
 Reject generic facts, listicles, unsupported mysteries, fake NASA claims,

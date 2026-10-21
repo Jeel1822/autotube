@@ -322,6 +322,260 @@ def _synthesize_azure(
 
 
 # ---------------------------------------------------------------------------
+# Gemini TTS (uses the same GEMINI_API_KEY as the rest of the pipeline)
+# ---------------------------------------------------------------------------
+
+# Preview models; names change, so the list is overridable. Tried in order.
+GEMINI_TTS_MODELS = [
+    m.strip() for m in os.environ.get(
+        "GEMINI_TTS_MODELS",
+        "gemini-3.1-flash-tts-preview,gemini-2.5-flash-preview-tts",
+    ).split(",") if m.strip()
+]
+GEMINI_TTS_VOICE = os.environ.get("GEMINI_TTS_VOICE", "Charon")
+GEMINI_TTS_STYLE = os.environ.get(
+    "GEMINI_TTS_STYLE",
+    "Say in a calm, curious, awe-struck documentary narrator voice, at a "
+    "steady and engaging pace",
+)
+GEMINI_TTS_MAX_CHARS = 2500          # per request (docs cap a text field at ~4 KB)
+GEMINI_TTS_CHUNK_WAIT = int(os.environ.get("GEMINI_TTS_CHUNK_WAIT", "31"))
+
+
+def _split_for_gemini(text: str, limit: int = GEMINI_TTS_MAX_CHARS) -> list:
+    """Split at sentence boundaries into chunks <= limit characters."""
+    sentences = re.split(r"(?<=[.!?])\s+", text.strip())
+    chunks, cur = [], ""
+    for sent in sentences:
+        if cur and len(cur) + 1 + len(sent) > limit:
+            chunks.append(cur)
+            cur = sent
+        else:
+            cur = f"{cur} {sent}".strip()
+    if cur:
+        chunks.append(cur)
+    return chunks or [text]
+
+
+def _gemini_pcm(client, model: str, prompt_text: str, voice_name: str):
+    """One TTS request. Returns (pcm_bytes, sample_rate)."""
+    from google.genai import types
+
+    response = client.models.generate_content(
+        model=model,
+        contents=prompt_text,
+        config=types.GenerateContentConfig(
+            response_modalities=["AUDIO"],
+            speech_config=types.SpeechConfig(
+                voice_config=types.VoiceConfig(
+                    prebuilt_voice_config=types.PrebuiltVoiceConfig(
+                        voice_name=voice_name,
+                    )
+                )
+            ),
+        ),
+    )
+    part = response.candidates[0].content.parts[0]
+    inline = getattr(part, "inline_data", None)
+    if inline is None or not inline.data:
+        raise RuntimeError("Gemini TTS returned no audio data.")
+    data = inline.data
+    if isinstance(data, str):
+        import base64
+        data = base64.b64decode(data)
+    rate = 24000  # Gemini TTS returns 24 kHz, 16-bit, mono PCM
+    m = re.search(r"rate=(\d+)", getattr(inline, "mime_type", "") or "")
+    if m:
+        rate = int(m.group(1))
+    return bytes(data), rate
+
+
+def _synthesize_gemini(
+    text: str,
+    voice: str,
+    audio_out: Path,
+    rate: str = "+0%",
+    pitch: str = "+0Hz",
+) -> list:
+    """
+    Gemini text-to-speech (preview). Free tier has tight limits (roughly
+    2 requests/minute and ~50/day, per Google's preview docs), which is
+    plenty for 3 Shorts a day. Returns no word boundaries, so
+    synthesize_speech() builds estimated timings from the real duration.
+
+    Env overrides: GEMINI_TTS_VOICE (default Charon), GEMINI_TTS_STYLE,
+    GEMINI_TTS_MODELS.
+    """
+    import shutil
+    import subprocess
+    import time
+
+    from src.gemini_client import (
+        get_client, _is_transient, _is_model_gone,
+    )
+
+    if not os.environ.get("GEMINI_API_KEY"):
+        raise RuntimeError("Gemini TTS needs GEMINI_API_KEY.")
+    ffmpeg = shutil.which("ffmpeg")
+    if not ffmpeg:
+        raise RuntimeError("Gemini TTS needs ffmpeg on PATH.")
+
+    client = get_client()
+    chunks = _split_for_gemini(text)
+    n_words = max(1, len(text.split()))
+    voice_name = GEMINI_TTS_VOICE
+    last_exc = None
+
+    for model in GEMINI_TTS_MODELS:
+        try:
+            pcm_parts, sr = [], 24000
+            for i, chunk in enumerate(chunks):
+                if i > 0:
+                    time.sleep(GEMINI_TTS_CHUNK_WAIT)  # free-tier RPM
+                words = max(1, len(chunk.split()))
+                # Try with the style instruction first; if the clip is
+                # suspiciously slow (the model read the instruction aloud),
+                # retry once with the bare text.
+                for use_style in (True, False):
+                    prompt_text = (
+                        f"{GEMINI_TTS_STYLE}: {chunk}" if use_style else chunk
+                    )
+                    for attempt in range(3):
+                        try:
+                            pcm, sr = _gemini_pcm(
+                                client, model, prompt_text, voice_name)
+                            break
+                        except Exception as exc:
+                            if attempt < 2 and _is_transient(exc):
+                                wait = (5, 20)[attempt]
+                                print(f"Gemini TTS transient error on {model}; "
+                                      f"retrying in {wait}s...")
+                                time.sleep(wait)
+                                continue
+                            raise
+                    seconds = len(pcm) / (sr * 2)
+                    if use_style and words / max(seconds, 0.1) < 1.6:
+                        print(f"Gemini TTS: clip is {seconds:.1f}s for "
+                              f"{words} words (too slow); the style prompt "
+                              f"may have been read aloud. Retrying bare.")
+                        continue
+                    break
+                pcm_parts.append(pcm)
+            pcm_all = b"".join(pcm_parts)
+            break
+        except Exception as exc:
+            last_exc = exc
+            if _is_model_gone(exc) or _is_transient(exc):
+                print(f"Gemini TTS model {model} unavailable "
+                      f"({type(exc).__name__}); trying the next one.")
+                continue
+            raise
+    else:
+        raise RuntimeError(f"Gemini TTS failed on all models: {last_exc}")
+
+    subprocess.run(
+        [ffmpeg, "-y", "-loglevel", "error",
+         "-f", "s16le", "-ar", str(sr), "-ac", "1", "-i", "pipe:0",
+         "-b:a", "128k", str(audio_out)],
+        input=pcm_all, check=True, timeout=300,
+    )
+    print(f"TTS: Gemini TTS ({model}, voice {voice_name}) wrote "
+          f"{Path(audio_out).stat().st_size} bytes of audio "
+          f"(~{len(pcm_all) / (sr * 2):.1f}s for {n_words} words).")
+    return []
+
+
+# ---------------------------------------------------------------------------
+# Local offline fallback (no account, key, card or internet)
+# ---------------------------------------------------------------------------
+
+def _rate_to_wpm(rate: str, base_wpm: int = 175) -> int:
+    """edge-tts style '+10%' / '-5%' -> macOS `say` words-per-minute."""
+    try:
+        pct = float(str(rate).replace("%", "").replace("+", ""))
+    except ValueError:
+        pct = 0.0
+    return max(80, min(400, int(base_wpm * (1 + pct / 100))))
+
+
+def _synthesize_local(
+    text: str,
+    voice: str,
+    audio_out: Path,
+    rate: str = "+0%",
+    pitch: str = "+0Hz",
+) -> list:
+    """
+    Last-resort offline TTS. Tries, in order:
+      1. Piper, if PIPER_MODEL points at a downloaded .onnx voice
+         (pip install piper-tts) -- best quality, fully offline.
+      2. macOS `say` -- built in, no install. Set LOCAL_TTS_VOICE to a
+         voice name (e.g. "Ava (Premium)", "Evan (Enhanced)"; download
+         better ones in System Settings > Accessibility > Spoken Content
+         > System Voice > Manage Voices). `say -v ?` lists them.
+
+    Neither returns word boundaries, so this returns [] and
+    synthesize_speech() builds estimated timings from the real audio
+    duration, exactly like the Azure fallback.
+    """
+    import shutil
+    import subprocess
+    import tempfile
+
+    audio_out = Path(audio_out)
+    ffmpeg = shutil.which("ffmpeg")
+    if not ffmpeg:
+        raise RuntimeError("Local TTS fallback needs ffmpeg on PATH.")
+
+    with tempfile.TemporaryDirectory() as tmp:
+        raw = Path(tmp) / "raw"
+
+        piper_model = os.environ.get("PIPER_MODEL", "").strip()
+        piper_bin = shutil.which("piper")
+
+        if piper_model and piper_bin:
+            raw = raw.with_suffix(".wav")
+            subprocess.run(
+                [piper_bin, "-m", piper_model, "-f", str(raw)],
+                input=text.encode("utf-8"),
+                check=True,
+                timeout=300,
+            )
+            engine = "Piper"
+
+        elif shutil.which("say"):
+            raw = raw.with_suffix(".aiff")
+            cmd = ["say", "-o", str(raw), "-r", str(_rate_to_wpm(rate))]
+            local_voice = os.environ.get("LOCAL_TTS_VOICE", "").strip()
+            if local_voice:
+                cmd += ["-v", local_voice]
+            subprocess.run(
+                cmd, input=text.encode("utf-8"), check=True, timeout=300
+            )
+            engine = f"macOS say ({local_voice or 'default voice'})"
+
+        else:
+            raise RuntimeError(
+                "No local TTS available: set PIPER_MODEL (and install "
+                "piper-tts) or run on macOS where `say` exists."
+            )
+
+        if not raw.exists() or raw.stat().st_size == 0:
+            raise RuntimeError("Local TTS produced no audio.")
+
+        subprocess.run(
+            [ffmpeg, "-y", "-loglevel", "error", "-i", str(raw),
+             "-ar", "44100", "-ac", "1", "-b:a", "128k", str(audio_out)],
+            check=True,
+            timeout=300,
+        )
+
+    print(f"TTS: local fallback ({engine}) wrote {audio_out.stat().st_size} "
+          f"bytes of audio.")
+    return []
+
+
+# ---------------------------------------------------------------------------
 # Audio duration
 # ---------------------------------------------------------------------------
 
@@ -745,9 +999,12 @@ def synthesize_speech(
     # back to Azure Speech, which returns audio only (no boundaries).
     # ---------------------------------------------------------------
 
-    try:
-
-        word_boundaries = asyncio.run(
+    # Provider order is configurable: TTS_ORDER="edge,gemini,azure,local"
+    # (default). To try the Gemini voice first: TTS_ORDER="gemini,edge,azure,local".
+    # Only edge-tts returns native word timings; the others return [] and
+    # estimated timings are built from the real audio duration.
+    def _edge():
+        return asyncio.run(
             _synthesize_with_retry(
                 text=text,
                 voice=voice,
@@ -757,20 +1014,41 @@ def synthesize_speech(
             )
         )
 
-    except Exception as exc:
+    providers = {
+        "edge": ("edge-tts", _edge),
+        "gemini": ("Gemini TTS", lambda: _synthesize_gemini(
+            text=text, voice=voice, audio_out=audio_out,
+            rate=rate, pitch=pitch)),
+        "azure": ("Azure Speech", lambda: _synthesize_azure(
+            text=text, voice=voice, audio_out=audio_out,
+            rate=rate, pitch=pitch)),
+        "local": ("local offline TTS", lambda: _synthesize_local(
+            text=text, voice=voice, audio_out=audio_out,
+            rate=rate, pitch=pitch)),
+    }
+    order = [
+        k.strip().lower()
+        for k in os.environ.get("TTS_ORDER", "edge,gemini,azure,local").split(",")
+        if k.strip().lower() in providers
+    ] or ["edge", "gemini", "azure", "local"]
 
-        print(
-            f"WARNING: edge-tts failed after {EDGE_TTS_ATTEMPTS} "
-            f"attempts ({type(exc).__name__}); "
-            f"falling back to Azure Speech."
-        )
-
-        word_boundaries = _synthesize_azure(
-            text=text,
-            voice=voice,
-            audio_out=audio_out,
-            rate=rate,
-            pitch=pitch,
+    word_boundaries = None
+    failures = []
+    for key in order:
+        name, fn = providers[key]
+        try:
+            word_boundaries = fn()
+            if failures:
+                print(f"TTS: succeeded with {name} after: "
+                      + "; ".join(failures))
+            break
+        except Exception as exc:
+            failures.append(f"{name} ({type(exc).__name__})")
+            print(f"WARNING: {name} failed ({type(exc).__name__}: "
+                  f"{str(exc)[:160]}); trying the next provider.")
+    else:
+        raise RuntimeError(
+            "All TTS providers failed: " + "; ".join(failures)
         )
 
     # ---------------------------------------------------------------

@@ -1,5 +1,6 @@
 """Final opportunity-ranking agent."""
 
+from src.agents.content_filter import load_playbook, playbook_prompt_block
 from src.agents.orchestrator import run_json_batch
 
 
@@ -12,7 +13,8 @@ def select_winners(finalists: list[dict], config: dict, count: int = 5,
         f"VISUAL: {x.get('visual', 0)}\n"
         f"SCIENCE CONFIDENCE: {x.get('science_confidence', x.get('accuracy_score', 0))}\n"
         f"ORIGINALITY NOTE: {x.get('novelty_reason', '')}\n"
-        f"SCIENCE NOTE: {x.get('safe_framing', '')}"
+        f"SCIENCE NOTE: {x.get('safe_framing', '')}\n"
+        f"WINNING-PATTERN TAGS: {', '.join(x.get('filter_tags', [])) or 'none'}"
         for i, x in enumerate(finalists)
     )
 
@@ -20,12 +22,24 @@ def select_winners(finalists: list[dict], config: dict, count: int = 5,
     if performance_summary:
         performance_block = f"""
 
-REAL CHANNEL PERFORMANCE DATA (use this to inform your ranking -- prefer
-candidates that resemble the style/subject/angle of what has genuinely
-performed well on THIS channel before, and be more cautious about
-patterns resembling what has underperformed):
+REAL CHANNEL PERFORMANCE DATA (use this to learn the PATTERN: the style and
+angle of what has genuinely performed well on THIS channel, and be more
+cautious about patterns resembling what has underperformed. NEVER reward a
+candidate for repeating the SUBJECT of a past video: a remake of an existing
+video, even reworded, must score below 40; the audience already saw it):
 {performance_summary}
 """
+
+    if not performance_summary:
+        # No live analytics yet (needs 5+ videos older than 3 days), so fall
+        # back to the playbook distilled from the Studio export.
+        pb_block = playbook_prompt_block(load_playbook(config.get("channel_id", "")))
+        if pb_block:
+            performance_block = (
+                "\n\nCHANNEL PLAYBOOK (real analytics; candidates tagged with "
+                "WINNING-PATTERN TAGS resemble past hits -- prefer them; "
+                "penalize anything resembling WHAT FAILS. Never reward a candidate for building on or mirroring a past video: a remake of an existing video, even reworded, scores below 40):\n" + pb_block + "\n"
+            )
 
     return run_json_batch(
         "Chief Editor",

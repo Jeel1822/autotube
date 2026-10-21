@@ -22,6 +22,7 @@ current chat.send_message() flow instead of direct models.generate_content().
 """
 
 import os
+import re
 from datetime import datetime, timedelta, timezone
 
 import requests
@@ -80,9 +81,136 @@ def _fetch_reddit_trending(subreddit: str, limit: int = 12) -> list:
         return []
 
 
-def _fetch_youtube_trending(query: str, max_results: int = 15) -> list:
+# Pseudoscience / conspiracy bait gets huge ratios on tiny channels but is
+# the wrong signal for a science channel (the Science Guardian would reject
+# it anyway; don't even feed it to the Topic Hunter).
+_CLICKBAIT = re.compile(
+    r"flat earth|illuminati|conspiracy|nasa (is )?(hiding|lying|covering)|"
+    r"they don.t want you|terrifying truth|exposed|hoax|proof (that )?earth|"
+    r"\bufo\b|aliens? (found|caught|spotted)",
+    re.I,
+)
+
+
+def _fetch_youtube_outliers(
+    queries: list,
+    max_results: int = 15,
+    exclude_channel_id: str = None,
+) -> list:
+    """
+    Outlier-ranked YouTube signal. Raw view counts mostly rank channel SIZE
+    (a 400k video on a 2M-sub channel is a normal Tuesday); what's worth
+    studying is a video that beat its own channel's size by a wide margin.
+    So: find recent top short videos for the queries, look up each channel's
+    subscriber count, and rank by views / max(subscribers, 1000).
+
+    Cost per call: 100 quota units per query + ~2 units for the lookups
+    (free daily quota is 10,000). Returns titles best-outlier first, or []
+    if anything fails (caller falls back to the plain view-count ranking).
+    """
+    api_key = os.environ.get("YOUTUBE_DATA_API_KEY")
+    if not api_key or not queries:
+        return []
+    base = "https://www.googleapis.com/youtube/v3"
+    try:
+        published_after = (
+            datetime.now(timezone.utc) - timedelta(days=45)
+        ).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+        ids = []
+        for q in queries:
+            resp = requests.get(
+                f"{base}/search",
+                params={
+                    "part": "snippet", "q": q, "type": "video",
+                    "videoDuration": "short", "order": "viewCount",
+                    "publishedAfter": published_after, "maxResults": 50,
+                    "relevanceLanguage": "en", "key": api_key,
+                },
+                timeout=15,
+            )
+            resp.raise_for_status()
+            ids += [i["id"]["videoId"] for i in resp.json().get("items", [])
+                    if i.get("id", {}).get("videoId")]
+        ids = list(dict.fromkeys(ids))
+        if not ids:
+            return []
+
+        videos = []
+        for i in range(0, len(ids), 50):
+            r = requests.get(
+                f"{base}/videos",
+                params={"part": "snippet,statistics,contentDetails",
+                        "id": ",".join(ids[i:i + 50]), "key": api_key},
+                timeout=15,
+            )
+            r.raise_for_status()
+            videos += r.json().get("items", [])
+
+        channel_ids = list({v["snippet"]["channelId"] for v in videos})
+        subs = {}
+        for i in range(0, len(channel_ids), 50):
+            r = requests.get(
+                f"{base}/channels",
+                params={"part": "statistics",
+                        "id": ",".join(channel_ids[i:i + 50]), "key": api_key},
+                timeout=15,
+            )
+            r.raise_for_status()
+            for c in r.json().get("items", []):
+                st = c.get("statistics", {})
+                if not st.get("hiddenSubscriberCount"):
+                    subs[c["id"]] = int(st.get("subscriberCount", 0) or 0)
+
+        from src.channel_sync import iso_duration_seconds
+        scored = []
+        for v in videos:
+            cid = v["snippet"]["channelId"]
+            if cid == exclude_channel_id or cid not in subs:
+                continue
+            views = int(v.get("statistics", {}).get("viewCount", 0) or 0)
+            dur = iso_duration_seconds(v["contentDetails"].get("duration", ""))
+            title = v["snippet"]["title"]
+            if views < 10000 or dur > 90 or _CLICKBAIT.search(title):
+                continue
+            # 3,000-sub floor: below that, one lucky share looks like a
+            # 300x "outlier" without telling us anything about the idea.
+            ratio = views / max(subs[cid], 3000)
+            if ratio >= 1.0:
+                scored.append((ratio, views, subs[cid], cid, v["snippet"]["title"]))
+        scored.sort(reverse=True)
+
+        titles, per_channel = [], {}
+        for ratio, views, sub_n, cid, title in scored:
+            if per_channel.get(cid, 0) >= 2:   # one channel shouldn't dominate
+                continue
+            per_channel[cid] = per_channel.get(cid, 0) + 1
+            titles.append(title)
+            if len(titles) <= 3:
+                print(f"  Trend outlier {ratio:.0f}x: {title[:60]} "
+                      f"({views:,} views, {sub_n:,} subs)")
+            if len(titles) >= max_results:
+                break
+        return titles
+    except Exception as e:
+        print(f"WARNING: outlier ranking failed ({e}); using plain "
+              f"view-count ranking.")
+        return []
+
+
+def _fetch_youtube_trending(
+    query: str,
+    max_results: int = 15,
+    extra_queries: list = None,
+    exclude_channel_id: str = None,
+) -> list:
     """
     Use YouTube Data API search as the primary trend signal.
+
+    Tries the outlier ranking first (videos that beat their own channel's
+    size; see _fetch_youtube_outliers) across `query` plus any
+    `extra_queries`, and falls back to the plain top-by-views list below if
+    that yields fewer than 5 titles.
 
     Requires:
 
@@ -96,6 +224,14 @@ def _fetch_youtube_trending(query: str, max_results: int = 15) -> list:
 
     if not api_key:
         return []
+
+    outliers = _fetch_youtube_outliers(
+        [query] + list(extra_queries or []),
+        max_results=max_results,
+        exclude_channel_id=exclude_channel_id,
+    )
+    if len(outliers) >= 5:
+        return outliers
 
     try:
         published_after = (

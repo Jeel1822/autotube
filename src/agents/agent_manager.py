@@ -10,6 +10,7 @@ from pathlib import Path
 
 import yaml
 
+from src.agents.content_filter import filter_candidates
 from src.agents.editor_agent import select_winners
 from src.agents.memory import load_memory, load_used_topics, remember, save_daily_brain
 from src.agents.novelty_agent import check_topics
@@ -31,7 +32,18 @@ def load_channel_config(channel_id: str) -> dict:
 
 def collect_signals(channel_id: str, config: dict) -> list[str]:
     signals: list[str] = []
-    yt = _fetch_youtube_trending(config.get("niche", channel_id), max_results=15)
+    own_id = None
+    try:
+        from src.channel_sync import resolve_channel_id
+        own_id = resolve_channel_id(channel_id, config)
+    except Exception:
+        pass
+    yt = _fetch_youtube_trending(
+        config.get("niche", channel_id),
+        max_results=15,
+        extra_queries=config.get("trend_queries") or [],
+        exclude_channel_id=own_id,
+    )
     if yt:
         print(f"Trend Scout: received {len(yt)} YouTube signals.")
         signals.extend(yt)
@@ -61,6 +73,14 @@ def run_daily_brain(channel_id: str) -> dict:
     print(f"Channel: {config['display_name']}")
     print(f"Previous topics: {len(previous)}")
 
+    # Weekly learning loop: pull the real upload history, backfill the video
+    # registry, refresh the measured playbook stats. Best-effort, never fatal.
+    try:
+        from src.channel_sync import maybe_sync
+        maybe_sync(channel_id, config)
+    except Exception as e:
+        print(f"WARNING: channel sync unavailable ({e}).")
+
     signals = collect_signals(channel_id, config)
     print(f"Live signal items: {len(signals)}")
 
@@ -69,6 +89,21 @@ def run_daily_brain(channel_id: str) -> dict:
     print(f"Generated candidates: {len(candidates)}")
     if not candidates:
         raise RuntimeError("Topic Hunter returned no usable candidates.")
+
+    print("\nSTEP 1b — CONTENT FILTER (deterministic, no Gemini call)")
+    try:
+        kept, rejected = filter_candidates(channel_id, candidates)
+        for topic, reason in rejected:
+            print(f"  x {topic[:75]} -- {reason}")
+        print(f"Content filter: kept {len(kept)}/{len(candidates)} candidates.")
+        # Fail open: never let the filter starve the pipeline.
+        if len(kept) >= 5:
+            candidates = kept
+        else:
+            print("WARNING: content filter left fewer than 5 candidates; "
+                  "using the unfiltered list this run.")
+    except Exception as e:
+        print(f"WARNING: content filter failed ({e}); continuing unfiltered.")
 
     candidate_topics = [x["topic"] for x in candidates]
 

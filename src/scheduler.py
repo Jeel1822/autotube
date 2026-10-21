@@ -88,6 +88,8 @@ def _is_longform_day(channel_id: str, config: dict, today: str) -> bool:
     ("every other day"), skips today if it last succeeded yesterday (or
     today already, though the daily done_slots check handles that case
     too), and runs if 2+ days have passed or it's never run before."""
+    if config.get("longform_enabled", True) is False:
+        return False  # long-form paused for this channel
     interval_days = config.get("longform_interval_days", 1)
     if interval_days <= 1:
         return True

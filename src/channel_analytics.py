@@ -62,6 +62,13 @@ def fetch_video_performance(youtube_analytics, video_ids: list) -> dict:
         return {}
 
 
+def _fmt_stats(stats: dict) -> str:
+    pct = stats.get("avg_view_pct")
+    if pct is None:
+        return f"{stats['views']} views"
+    return f"{stats['views']} views, {pct:.0f}% avg retention"
+
+
 def build_performance_summary(channel_id: str, token_path: str,
                                client_secret_path: str = None,
                                max_examples: int = 10) -> str:
@@ -95,15 +102,29 @@ def build_performance_summary(channel_id: str, token_path: str,
               f"this run (need at least 5).")
         return None
 
+    video_ids = [e["video_id"] for e in eligible]
+    performance = {}
     try:
         youtube_analytics = get_analytics_service(token_path, client_secret_path)
+        performance = fetch_video_performance(youtube_analytics, video_ids)
     except Exception as e:
-        print(f"WARNING: could not authenticate for Analytics ({e}); "
-              f"no performance context available this run.")
-        return None
+        print(f"WARNING: could not use the Analytics API ({e}).")
 
-    video_ids = [e["video_id"] for e in eligible]
-    performance = fetch_video_performance(youtube_analytics, video_ids)
+    if not performance:
+        # No analytics token (or it failed): fall back to the public view
+        # counts that channel_sync.py stores. Views only, no retention.
+        try:
+            from src.channel_sync import load_snapshot
+            views = (load_snapshot(channel_id) or {}).get("views_by_id", {})
+            performance = {
+                vid: {"views": views[vid], "avg_view_pct": None}
+                for vid in video_ids if vid in views
+            }
+            if performance:
+                print("Analytics: using public view counts from the channel "
+                      "sync (no retention data).")
+        except Exception:
+            performance = {}
     if not performance:
         return None
 
@@ -117,7 +138,9 @@ def build_performance_summary(channel_id: str, token_path: str,
         # attention (retention) is the stronger signal for what topics
         # to repeat -- weighting retention noticeably higher than raw
         # views so a low-view-but-high-retention topic still surfaces.
-        combined = stats["views"] * 0.4 + stats["avg_view_pct"] * 10 * 0.6
+        pct = stats.get("avg_view_pct")
+        combined = (stats["views"] if pct is None
+                    else stats["views"] * 0.4 + pct * 10 * 0.6)
         scored.append((combined, entry["topic"], stats))
 
     if not scored:
@@ -129,15 +152,13 @@ def build_performance_summary(channel_id: str, token_path: str,
 
     lines = ["TOP PERFORMING PAST TOPICS ON THIS CHANNEL (real data):"]
     for _, topic, stats in top:
-        lines.append(f"- \"{topic}\" -- {stats['views']} views, "
-                      f"{stats['avg_view_pct']:.0f}% avg retention")
+        lines.append(f"- \"{topic}\" -- {_fmt_stats(stats)}")
 
     if bottom:
         lines.append("")
         lines.append("LOWER PERFORMING PAST TOPICS (avoid repeating this pattern):")
         for _, topic, stats in bottom:
-            lines.append(f"- \"{topic}\" -- {stats['views']} views, "
-                          f"{stats['avg_view_pct']:.0f}% avg retention")
+            lines.append(f"- \"{topic}\" -- {_fmt_stats(stats)}")
 
     summary = "\n".join(lines)
     print(f"Analytics: built performance summary from {len(scored)} "

@@ -7,6 +7,7 @@ None of your existing tokens will work here; this needs its own
 token file, generated once via the interactive browser flow.
 """
 import pickle
+import sys
 from pathlib import Path
 
 from google.auth.transport.requests import Request
@@ -37,6 +38,13 @@ def get_analytics_service(token_path: str, client_secret_path: str = None):
                       f"refreshed ({e}); falling back to interactive login.")
                 creds = None
         if not creds:
+            if not sys.stdin.isatty():
+                raise RuntimeError(
+                    f"No valid analytics token at {token_path} and this is an "
+                    f"unattended run, so a browser login would hang. Authorize "
+                    f"once from a terminal: python3 -m src.analytics_auth "
+                    f"<channel_id>"
+                )
             if not client_secret_path:
                 raise RuntimeError(
                     f"No valid analytics token at {token_path} and no "
@@ -53,3 +61,17 @@ def get_analytics_service(token_path: str, client_secret_path: str = None):
             pickle.dump(creds, f)
 
     return build("youtubeAnalytics", "v2", credentials=creds)
+
+
+if __name__ == "__main__":
+    # One-time interactive authorization:  python3 -m src.analytics_auth cosmic_curious
+    if len(sys.argv) < 2:
+        print("usage: python3 -m src.analytics_auth <channel_id>")
+        sys.exit(1)
+    root = Path(__file__).resolve().parents[1]
+    secret = root / "client_secret.json"
+    svc = get_analytics_service(
+        str(root / "tokens" / f"{sys.argv[1]}_analytics_token.pickle"),
+        str(secret) if secret.exists() else None,
+    )
+    print("Analytics token ready:", svc is not None)

@@ -22,8 +22,9 @@ def _get_audio_duration(audio_path: str) -> float:
     return float(out.stdout.strip())
 
 
-def _build_caption_chunks(timing_path: str, words_per_caption: int = 4) -> list:
-    """Groups word-level timings into short caption chunks: [(start, end, text), ...]"""
+def _build_caption_chunks(timing_path: str, words_per_caption: int = 3) -> list:
+    """Groups word-level timings into short caption chunks: [(start, end, text), ...]
+    Using 3 words per chunk for ultra-punchy, fast-paced retention on Shorts."""
     words = json.loads(Path(timing_path).read_text())
     chunks = []
     for i in range(0, len(words), words_per_caption):
@@ -52,10 +53,16 @@ def _escape_ass_text(text: str) -> str:
 
 def _write_ass_subtitles(chunks: list, ass_path: Path, width: int, height: int,
                           font_size: int, portrait: bool) -> None:
-    """Writes all caption chunks into a single .ass file (one subtitle track,
-    burned in later with a single `subtitles=` filter instead of N chained
-    drawtext filters -- this is what keeps ffmpeg fast on long videos)."""
-    margin_v = int(font_size * 3.2)
+    """Writes all caption chunks into a single .ass file using a high-retention,
+    high-contrast style: bold yellow text with a heavy dark outline and shadow,
+    centered for maximum readability on YouTube Shorts."""
+    # Place captions slightly higher up on portrait to avoid YouTube Shorts UI overlays
+    margin_v = int(height * 0.28) if portrait else int(height * 0.15)
+
+    # &H0000FFFF = Vibrant Yellow (AABBGGRR in ASS hex)
+    # PrimaryColour: &H0000FFFF (Yellow)
+    # OutlineColour: &H00000000 (Black)
+    # BackColour: &H80000000 (Semi-transparent black background shadow)
     header = f"""[Script Info]
 ScriptType: v4.00+
 PlayResX: {width}
@@ -65,14 +72,14 @@ ScaledBorderAndShadow: yes
 
 [V4+ Styles]
 Format: Name, Fontname, Fontsize, PrimaryColour, OutlineColour, BackColour, Bold, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
-Style: Default,FreeSans,{font_size},&H00FFFFFF,&H00000000,&H99000000,1,3,2,0,2,40,40,{margin_v},1
+Style: Default,Impact,{font_size},&H0000FFFF,&H00000000,&H80000000,1,1,4,2,2,30,30,{margin_v},1
 
 [Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 """
     lines = [header]
     for start, end, text in chunks:
-        escaped = _escape_ass_text(text)
+        escaped = _escape_ass_text(text.upper())  # Uppercase text yields higher CTR/retention
         lines.append(
             f"Dialogue: 0,{_ass_timestamp(start)},{_ass_timestamp(end)},"
             f"Default,,0,0,0,,{escaped}\n"

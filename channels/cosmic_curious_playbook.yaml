@@ -1,0 +1,144 @@
+# Cosmic Curious content playbook -- derived from the real YouTube Studio
+# export (Aug 30 - Oct 18, 2026; 214 Shorts + 13 long-form videos).
+# Edit this file to retune topic selection; no code changes needed.
+# Re-export analytics every ~2 weeks and update the lists below.
+#
+# CAUTION: samples are small (n=6-50 per pattern). Treat the rules as strong
+# hints that get re-tested every export, not as laws.
+#
+# Baseline: only 12% of Shorts reached 250+ views; 68% got 10 or fewer. 15 videos
+# produced 67% of all Short views. So the job is raising the hit-rate, not volume.
+
+# ---- Shown to the Topic Hunter and Chief Editor prompts --------------------
+works:
+  - "Walking on a comet would launch you into orbit"             # 1,376 views
+  - "Why every rocket wants to launch from the equator"          # 1,251
+  - "How quantum fluctuations built the cosmic web"              # 1,240
+  - "What sound actually sounds like on Saturn's moon Titan"     # 1,196
+  - "When dying stars plow through space"                        # 1,054
+  - "The physics of Saturn's hexagon storm"                      # 1,026
+  - "Earth has a secret temporary moon"                          # 1,020
+  - "Dragonfly 44: the Milky Way-sized galaxy with almost no stars"  # 1,017
+  - "Why compasses fail on an all-iron planet"                   # 979
+  - "Floating inches above a tumbling asteroid"                  # 963
+  - "Standing on a planet made of pure glass"                    # 666
+  - "It rains solid diamonds on Neptune"                         # 564
+  - "What if a second Earth was hiding behind the Sun?"          # 555
+  - "Why sunlight takes 100,000 years to escape the Sun"         # 405
+patterns:
+  - "FIRST-PERSON SCENE openers ('Walking on...', 'Standing on...', 'Floating above...', 'Falling into...') on a real object, ending in ONE surprising consequence: 36% reached 250+ views vs 11% for everything else."
+  - "EVERYDAY-OBJECT anchor (compass, glass, diamonds, rocket, comet, asteroid, ice, rain, the Moon): 30% hit vs 8% without. The viewer should picture it instantly."
+  - "SHORT titles, 6 words or fewer: 23% hit vs 11%."
+  - "A HIDDEN or SECRET object ('secret temporary moon', 'second Earth hiding behind the Sun', a galaxy with almost no stars): 25% hit."
+  - "SOUND and SCALE hooks (what it sounds like on Titan, sunlight taking 100,000 years): several of the top 10."
+  - "One strange claim per Short. State the weird thing in the first line, in plain words."
+fails:
+  - "Titles that open with 'How ...' (mechanism titles): only 2 of 51 reached 250 views (4%) vs 15% for other openers. Rephrase as a scene or a plain claim."
+  - "Abstract jargon the viewer must already know (Roche lobe, accretion, frame-dragging, planetary nebula, protoplanetary disk, nuclear pasta, magnetic fields, binary stars, tidal locking, Chandrasekhar): ~0 of 40 reached 250 views."
+  - "Famous textbook facts with no strange concrete consequence also flop: 'What if Earth stopped spinning?' (1 view), 'Why the Moon is slowly leaving Earth' (2), 'Why Mars sunsets are blue' (1), 'Why a day on Venus is longer than its year' (1). Familiar is not enough; it needs a surprising consequence."
+  - "Re-doing the same subject or title again and again (3 asteroid variants, 5 Saturn-ring videos in a week, the same dust-grain title twice): the repeats split the audience and did worse than the first."
+  - "Long-form: 13 videos have earned 133 views in total (median 2). Do not publish long-form until Shorts bring an audience; every long-form slot also takes the day's #1 ranked topic."
+  - "Publishing 4+ Shorts a day: median 4-5 views and a 9-10% hit rate, vs median ~206 and 45% on days with 1-3 uploads (partly confounded with channel growth over time). Keep to 3 a day or fewer."
+generation_mix:
+  - "Of the 30 candidates, at least 10 must open as a first-person scene ('Walking on...', 'Standing on...', 'Floating above...', 'Falling into...') on a real, named object."
+  - "At least 6 must hinge on an everyday object or sensation (a compass, glass, rain, diamonds, sound, a rocket, your body)."
+  - "At least 4 must be a hidden / secret / missing-object idea (a second Earth, a temporary moon, a galaxy missing its stars)."
+  - "Never open a topic with 'How'. Keep each topic to 8 words or fewer."
+
+# ---- Deterministic filter (src/agents/content_filter.py) -------------------
+filter:
+  max_topic_words: 16          # hard cap, extremes only (the pipeline rewrites the topic into a title later)
+  prefer_topic_words: 8        # <= this earns the "short" tag and sorts first; best Shorts titles are 4-6 words
+  reject_colon_titles: false   # colon titles showed no effect (median 5 vs 5)
+  reject_prefixes:             # case-insensitive "starts with"
+    - "how "
+  boost:                       # tags sort matching candidates first (the Science Guardian only sees the first 15)
+    first_person: ["walking on", "walking across", "standing on", "standing in", "standing inside", "floating", "orbiting", "drifting", "falling into", "falling through", "swimming", "diving into", "flying through", "riding", "sliding", "gliding", "surfing", "breathing"]
+    everyday_object: [compass, glass, diamond, rocket, comet, asteroid, ice, "rain", "moon", "sound", "sounds", "hear", "ocean", "lightning", "air", "your body", "blood", "eyes"]
+    hidden_object: [secret, hidden, temporary, "second earth", "twin", missing, invisible]
+  jargon_terms:
+    - roche lobe
+    - accretion
+    - super-rotation
+    - superrotation
+    - metal-poor
+    - metal-rich
+    - metallicity
+    - planetary nebula
+    - embedded moons
+    - halo stars
+    - sublimation
+    - volatiles
+    - eccentric orbit
+    - spacetime curvature
+    - frame-dragging
+    - chandrasekhar
+    - protoplanetary
+    - nuclear pasta
+    - microlensing
+    - magnetic reconnection
+    - tidal locking
+    - photon sphere
+    - fusion shells
+    - stellar wind
+    - pulsar glitch
+    - casimir
+    - supercritical
+    - polytropic
+    - nucleosynthesis
+    - baryon
+    - stellar population
+    - binary star
+    - binary stars
+    - magnetic field
+  near_duplicate_threshold: 0.5   # content-word overlap vs recent topics
+  subject_cap:
+    window: 14                    # look at the last N published topics
+    max_per_subject: 2            # reject a 3rd topic on the same subject
+    subjects:
+      saturn: [saturn]
+      jupiter: [jupiter]
+      sun: [sun, solar, sunspot, flare, corona]
+      black hole: [black hole]
+      neutron star: [neutron star, pulsar, magnetar]
+      moon: [moon, lunar]
+      mars: [mars, martian]
+      asteroid: [asteroid]
+      comet: [comet]
+      venus: [venus]
+      neptune/uranus: [neptune, uranus]
+      earth: [earth]
+
+# Last 30 published Shorts, so the duplicate/subject checks work even if the
+# video registry is incomplete. Newest last.
+seed_recent_titles:
+  - "How Metal-Rich Systems Flip Hot Jupiters Upside Down"
+  - "Why Supernovas Launch Neutron Stars Across the Galaxy"
+  - "The Dead Stars Shooting Corkscrews Through Space"
+  - "Why Jupiter's Auroras Pulse Like a Metronome"
+  - "When an Icy Moon's Orbit Suddenly Stretches"
+  - "How Sunspots Choke Off the Sun's Heat"
+  - "How Metal-Poor Halo Stars Preserve the First Stars' Fingerprints"
+  - "The Planet That Rains Its Own Sky Every Year"
+  - "Why These Ultra-Short-Period Exoplanets Have Glowing Tails of Vaporized Rock"
+  - "When Neutron Stars Rip Reality From Empty Space"
+  - "How Solar Flares Accelerate Electrons to Near Light Speed"
+  - "The Stars That Ring Like Bells"
+  - "What Actually Happens at the Center of Our Galaxy?"
+  - "Why compasses fail on an all-iron planet"
+  - "Earth Has a Secret Temporary Moon"
+  - "It Rains Solid Diamonds on Neptune"
+  - "Why your blood rushes to your head in space"
+  - "Floating inches above a tumbling asteroid"
+  - "Orbiting inches above a tumbling asteroid"
+  - "Floating inches above a spinning asteroid"
+  - "Standing on a Planet Made of Pure Glass"
+  - "What If Earth Lost Air For 60 Seconds?"
+  - "Hear Saturn's rings actually whistle"
+  - "Falling into Saturn's shadow"
+  - "Why Solar Storms Make Compasses Point South"
+  - "Saturn's rings are draining away"
+  - "How Massive Stars Tear Themselves Apart"
+  - "Walking on a Comet Would Launch You Into Orbit"
+  - "Floating Inside Jupiter's Great Red Spot"
+  - "How to stop a spaceship using thin air"

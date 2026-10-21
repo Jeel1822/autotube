@@ -1,7 +1,7 @@
 channel_id: cosmic_curious
 display_name: "Cosmic Curious"
 niche: "Science & space facts"
-tone: "curious, awe-struck, punchy — like telling a friend a mind-bending fact about the universe"
+tone: "conversational, punchy, and authentic — like you're telling a best friend a mind-bending secret about the universe. Use a warm, natural, and human cadence."
 video_length_seconds: 300 # ~5 min long-form
 short_length_seconds: 45
 voice: "en-US-AndrewNeural" # legacy fallback, kept for any code path still using it
@@ -42,7 +42,11 @@ use_hashtag_agent: true
 use_varied_pacing: true
 trend_subreddit: "space"
 upload_time_utc: "13:30" # long-form upload time
-longform_interval_days: 2 # every other day, not daily
+longform_interval_days: 2 # every other day, not daily (only used when longform_enabled)
+# Paused Oct 2026: 13 long-form videos earned 133 views in total (median 2),
+# and every long-form run also consumed the day's #1 ranked topic. Re-enable
+# (true) once Shorts reach a steady audience.
+longform_enabled: false
 # Reduced from 8/day to 3/day (Oct 2026): volume was outrunning quality and
 # reach had collapsed. Raise again only once Shorts retention is healthy.
 shorts_upload_times_utc: ["07:30", "13:30", "19:30"]
@@ -56,3 +60,16 @@ tags:
     "physics facts",
   ]
 category_id: "27" # YouTube category: Education
+
+# --- Learning loop (channel_sync.py) ---------------------------------------
+# Optional: your YouTube channel id (UC...; Studio > Settings > Channel >
+# Advanced settings). If blank it is auto-detected from the video registry.
+youtube_channel_id: ""
+sync_max_age_days: 7        # re-sync real stats / refresh the playbook weekly
+playbook_hit_views: 250     # a Short "hits" at this many views
+short_max_seconds: 75       # anything longer counts as long-form in stats
+# Extra YouTube searches for outlier-ranked trends (100 quota units each;
+# the free daily quota is 10,000). The niche string above is always searched.
+trend_queries:
+  - "space facts"
+  - "what if astronomy"

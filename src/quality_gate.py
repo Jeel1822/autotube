@@ -37,18 +37,69 @@ V3 improvements:
 import json
 import os
 import re
+import random
+import time
 
 from google import genai as genai_client
 
+from src.gemini_client import send_with_retry, _is_transient, _DOWN_UNTIL
+
 
 # Keep this synchronized with the rest of the project.
-GEMINI_MODEL = "gemini-3.5-flash-lite"
+# The gate is the project's fact-checker, so it prefers a stronger model
+# than the lite default. Override with QUALITY_GATE_MODEL; send_with_retry
+# still falls back to the other models if this one is overloaded.
+GEMINI_MODEL = os.environ.get("QUALITY_GATE_MODEL", "gemini-3.8-flash")
 
 # Initial check + 2 repairs = maximum 3 checks.
 MAX_REPAIR_ATTEMPTS = 2
 
 # Minimum score required for approval.
 MIN_APPROVAL_SCORE = 8.0
+
+
+def _send_message_with_retry(chat, prompt, max_attempts=5):
+    """Retry transient Gemini API failures without weakening the Quality Gate."""
+    transient_markers = (
+        "503",
+        "unavailable",
+        "429",
+        "resource_exhausted",
+        "500",
+        "502",
+        "504",
+        "deadline_exceeded",
+        "timeout",
+        "temporarily",
+    )
+
+    for attempt in range(max_attempts):
+        try:
+            return chat.send_message(prompt)
+        except Exception as exc:
+            message = str(exc).lower()
+            code = str(getattr(exc, "code", "")).lower()
+            status = str(getattr(exc, "status_code", "")).lower()
+
+            is_transient = (
+                any(marker in message for marker in transient_markers)
+                or any(marker in code for marker in transient_markers)
+                or any(marker in status for marker in transient_markers)
+            )
+
+            if not is_transient or attempt == max_attempts - 1:
+                raise
+
+            delay = min(60, 2 ** (attempt + 1))
+            delay += random.uniform(0, 1)
+
+            print(
+                f"Gemini temporary API failure: {exc}. "
+                f"Retrying in {delay:.1f}s "
+                f"({attempt + 1}/{max_attempts - 1})..."
+            )
+            time.sleep(delay)
+
 
 
 def _client():
@@ -698,9 +749,7 @@ scientific error.
 Do NOT invent facts in order to justify a rejection.
 """
 
-    response = chat.send_message(
-        prompt
-    )
+    response = send_with_retry(prompt, model=GEMINI_MODEL)
 
     result = _clean_json(
         response.text
@@ -778,7 +827,16 @@ Do NOT invent facts in order to justify a rejection.
     if result["score"] < MIN_APPROVAL_SCORE:
         result["approved"] = False
 
-    if result.get("problems"):
+    # Problems only block approval when they're not already outweighed by a
+    # passing score: the model lists nitpicks even on 9/10 scripts, and the
+    # score threshold (MIN_APPROVAL_SCORE) plus the deterministic checks
+    # above are the real gates. A "problems" list on a script the model
+    # itself approved at/above threshold is advisory.
+    if result.get("problems") and not (
+        result.get("approved") is True
+        and result["score"] >= MIN_APPROVAL_SCORE
+        and not basic_problems
+    ):
         result["approved"] = False
 
     return result
@@ -907,9 +965,7 @@ Target approximately {target_words} words.
 Return ONLY the spoken script.
 """
 
-    response = chat.send_message(
-        prompt
-    )
+    response = send_with_retry(prompt, model=GEMINI_MODEL)
 
     text = getattr(
         response,
@@ -937,6 +993,31 @@ Return ONLY the spoken script.
     )
 
     return text.strip()
+
+
+# When every Gemini model is overloaded at once, send_with_retry gives up
+# after ~10s. Demand spikes usually last minutes, so the gate waits longer
+# before declaring an outage (override with QUALITY_GATE_OUTAGE_WAITS, a
+# comma-separated list of seconds between rounds).
+_OUTAGE_WAITS = [
+    int(x) for x in os.environ.get("QUALITY_GATE_OUTAGE_WAITS", "20,45,90").split(",")
+    if x.strip()
+]
+
+
+def _with_outage_retry(fn, label, *args, **kwargs):
+    """Call fn; on a transient all-models-down error, wait and retry."""
+    for wait in _OUTAGE_WAITS + [None]:
+        try:
+            return fn(*args, **kwargs)
+        except Exception as exc:
+            if wait is None or not _is_transient(exc):
+                raise
+            print(f"Quality Gate: Gemini overloaded during {label}; "
+                  f"waiting {wait}s then retrying...", flush=True)
+            time.sleep(wait)
+            _DOWN_UNTIL.clear()  # let every model be tried again
+
 
 
 def validate_and_repair(
@@ -969,6 +1050,7 @@ def validate_and_repair(
 
     current_script = script
     last_review = None
+    real_rejections = 0  # checks that genuinely ran and said "not approved"
 
     for attempt in range(
         MAX_REPAIR_ATTEMPTS + 1
@@ -981,7 +1063,8 @@ def validate_and_repair(
         )
 
         try:
-            review = check_script(
+            review = _with_outage_retry(
+                check_script, "check",
                 topic,
                 current_script,
                 config,
@@ -994,23 +1077,33 @@ def validate_and_repair(
             )
 
             # Do not silently approve if the scientific reviewer failed.
-            last_review = {
-                "approved": False,
-                "score": 0.0,
-                "problems": [
-                    f"Scientific Quality Gate failed to run: {e}"
-                ],
-                "corrections": [
-                    "Retry the scientific review before publishing."
-                ],
-                "reason": (
-                    "The scientific reviewer did not return a valid result."
-                ),
-            }
+            # Keep the last real verdict (if any) instead of replacing it
+            # with a 0.0, so the caller can tell "topic was already being
+            # rejected" apart from "gate never got to run at all".
+            last_review = dict(
+                last_review or {
+                    "approved": False,
+                    "score": 0.0,
+                    "problems": [
+                        f"Scientific Quality Gate failed to run: {e}"
+                    ],
+                    "corrections": [
+                        "Retry the scientific review before publishing."
+                    ],
+                    "reason": (
+                        "The scientific reviewer did not return a valid "
+                        "result."
+                    ),
+                },
+                approved=False,
+                infra_failure=True,
+            )
 
             break
 
         last_review = review
+        if not review.get("approved"):
+            real_rejections += 1
 
         print(
             f"Quality Gate: score="
@@ -1050,7 +1143,8 @@ def validate_and_repair(
 
         try:
 
-            current_script = repair_script(
+            current_script = _with_outage_retry(
+                repair_script, "repair",
                 topic=topic,
                 script=current_script,
                 review=review,
@@ -1064,12 +1158,16 @@ def validate_and_repair(
                 f"WARNING: Quality Gate repair failed ({e})."
             )
 
-            # Keep the current script and fail closed.
+            # Keep the current script and fail closed. Flag it as an
+            # infrastructure failure so the caller doesn't blame the topic.
+            last_review = dict(last_review or {}, infra_failure=True)
             break
 
     print(
         "Quality Gate: FAILED after repair attempts."
     )
+
+    last_review = dict(last_review or {}, real_rejections=real_rejections)
 
     return (
         current_script,

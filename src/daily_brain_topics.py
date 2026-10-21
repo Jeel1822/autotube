@@ -51,12 +51,19 @@ def _run_daily_brain_once(channel_id: str) -> dict:
     return run_daily_brain(channel_id)
 
 
-def get_daily_brain_topic(channel_id: str, config: dict, is_short: bool) -> str:
+def get_daily_brain_topic(channel_id: str, config: dict, is_short: bool,
+                          dry_run: bool = False, exclude=None) -> str:
     """Main entry point. Returns a topic string from today's ranked
     winner list, running the Daily Brain first if it hasn't run yet
     today. Returns None on any failure or if this channel doesn't have
     use_daily_brain enabled -- callers must treat that as "fall back to
-    the existing topic-picking logic", not as an error."""
+    the existing topic-picking logic", not as an error.
+
+    dry_run=True never advances the consumed-slot counters, so a dry run
+    doesn't burn today's real slots. exclude is an optional set of topics
+    to skip (used when a topic was rejected earlier in the same run).
+    Topics the Quality Gate rejected today are persisted under
+    progress["rejected"] and always skipped."""
     if not config.get("use_daily_brain"):
         return None
 
@@ -84,28 +91,83 @@ def get_daily_brain_topic(channel_id: str, config: dict, is_short: bool) -> str:
         progress = {}
     if progress.get("date") != day:
         progress = {"date": day, "long_form_used": False, "shorts_used": 0}
+    progress.setdefault("used", [])
+    progress.setdefault("rejected", [])
 
-    # Long-form always gets the #1 ranked winner. Each Short works
-    # through winners in rank order (2nd, 3rd, ...); if there are more
-    # Shorts than winners, it wraps back to the start of the list rather
-    # than running out.
+    skip = set(progress["used"]) | set(progress["rejected"]) | set(exclude or ())
+    topics = [w.get("topic") for w in winners]
+
+    # Long-form starts at the #1 ranked winner. Each Short starts after
+    # the slots already consumed (2nd, 3rd, ...). Either way, topics
+    # already handed out today or rejected by the Quality Gate are
+    # skipped, so a rejected topic falls through to the next ranked one.
     if not is_short:
-        if progress["long_form_used"]:
+        if progress["long_form_used"] and not exclude:
             return None  # today's long-form slot already got its topic
-        progress["long_form_used"] = True
-        topic = winners[0].get("topic")
+        start_idx = 0
     else:
-        index = progress["shorts_used"] + 1  # +1 to skip the long-form's winner[0]
+        # winner[0] is reserved for long-form -- unless long-form is paused,
+        # in which case the Shorts get the #1 ranked topic first.
+        if config.get("longform_enabled", True) is False:
+            start_idx = 0
+        else:
+            start_idx = progress["shorts_used"] + 1
         if len(winners) == 1:
-            index = 0
-        elif index >= len(winners):
-    # Ran out of unique ranked winners for today -- fall through to
-    # Trend Scout / static topics rather than silently repeating an
-    # earlier slot's exact topic (which is what caused same-day
-    # duplicate uploads once Shorts count exceeded winner count).
-            return None
-        topic = winners[index].get("topic")
-        progress["shorts_used"] += 1
+            start_idx = 0
 
-    progress_path.write_text(json.dumps(progress))
+    def _remake(topic):
+        try:
+            from src.agents.content_filter import remake_reason
+            return remake_reason(channel_id, topic)
+        except Exception:
+            return None  # fail open: never block production on the filter
+
+    chosen_idx = None
+    for i in range(start_idx, len(topics)):
+        if not topics[i] or topics[i] in skip:
+            continue
+        why = _remake(topics[i])
+        if why:
+            print(f"Daily Brain: skipping #{i + 1} '{topics[i][:60]}' -- {why}")
+            continue
+        chosen_idx = i
+        break
+    if chosen_idx is None:
+        # Ran out of unique ranked winners for today -- fall through to
+        # Trend Scout / static topics rather than silently repeating an
+        # earlier slot's exact topic.
+        return None
+    topic = topics[chosen_idx]
+
+    if not dry_run:
+        if is_short:
+            progress["shorts_used"] = max(progress["shorts_used"], chosen_idx)
+        else:
+            progress["long_form_used"] = True
+        progress["used"].append(topic)
+        _write_progress(progress_path, progress)
     return topic
+
+
+def _write_progress(path: Path, progress: dict) -> None:
+    STATE_DIR.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(progress))
+
+
+def mark_topic_rejected(channel_id: str, topic: str) -> None:
+    """Persist that the Quality Gate rejected this topic today, so no later
+    slot (or a re-run) is handed the same flawed premise. Safe in dry runs:
+    a rejection is knowledge about the topic, not a consumed slot."""
+    path = _brain_state_path(channel_id)
+    day = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    try:
+        progress = json.loads(path.read_text()) if path.exists() else {}
+    except (json.JSONDecodeError, OSError):
+        progress = {}
+    if progress.get("date") != day:
+        progress = {"date": day, "long_form_used": False, "shorts_used": 0}
+    progress.setdefault("used", [])
+    progress.setdefault("rejected", [])
+    if topic not in progress["rejected"]:
+        progress["rejected"].append(topic)
+    _write_progress(path, progress)

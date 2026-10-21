@@ -26,6 +26,13 @@ Return JSON object:
   ]
 }}
 
+Judge the TOPIC TITLE ITSELF as the viewer will read it, not just the
+underlying science. If the title/hook states or implies something the real
+phenomenon does not do (e.g. "explode, vanish, then explode again" for objects
+that actually survive or only partly explode), verdict is REVISE or REJECT even
+if a related real phenomenon exists. A hook may be dramatic but must not be
+scientifically false or deceptive; put an honest rewording in safe_framing.
+
 Reject a materially misleading premise. Do not reject ordinary simplification
 for a general audience when it remains accurate.
 
