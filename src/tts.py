@@ -375,6 +375,8 @@ def _gemini_pcm(client, model: str, prompt_text: str, voice_name: str):
             ),
         ),
     )
+    if not response.candidates or not response.candidates[0].content or not response.candidates[0].content.parts:
+        raise RuntimeError("Gemini TTS returned an empty candidate or missing parts.")
     part = response.candidates[0].content.parts[0]
     inline = getattr(part, "inline_data", None)
     if inline is None or not inline.data:

@@ -134,6 +134,8 @@ def main():
 
     for config_path in sorted(channels_dir.glob("*.yaml")):
         config = yaml.safe_load(config_path.read_text())
+        if not config or "channel_id" not in config:
+            continue
         channel_id = config["channel_id"]
 
         if enabled is not None and channel_id not in enabled:
