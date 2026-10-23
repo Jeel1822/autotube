@@ -113,7 +113,7 @@ Return only the description text."""
 
 
 def build_description(title: str, script_text: str, topic: str,
-                       channel_tags: list, is_short: bool) -> str:
+                       channel_tags: list, is_short: bool, config: dict = None) -> str:
     """Short summary + subscribe CTA + a handful of hashtags.
 
     Hashtags: topic-specific ones first (YouTube shows only the first
@@ -122,10 +122,19 @@ def build_description(title: str, script_text: str, topic: str,
     """
     summary = _summarize_for_description(title, script_text, is_short)
 
+    # Use hashtag_agent if enabled
+    trending_hashtags = []
+    if config and config.get("use_hashtag_agent", False):
+        from src.agents.hashtag_agent import fetch_trending_hashtags
+        trending_hashtags = fetch_trending_hashtags(topic)
+
     extracted = _extract_hashtags_from_title(title, max_tags=3)
+    # If we have trending hashtags, combine them with extracted/broad ones
+    combined_tags = list(dict.fromkeys(trending_hashtags + extracted))
+
     broad = ["SpaceFacts", "Astronomy"]
     tag_words = list(dict.fromkeys(
-        t.replace(" ", "") for t in extracted + broad
+        t.replace(" ", "") for t in combined_tags + broad
     ))[:5]
     hashtags = " ".join("#" + t for t in tag_words)
     if is_short:
@@ -359,7 +368,7 @@ def run(channel_id: str, is_short: bool, privacy_status: str = "public",
         title = make_title(editorial_title, is_short)
         description = build_description(
             editorial_title, script_text, topic,
-            config["tags"] + extra_tags, is_short,
+            config["tags"] + extra_tags, is_short, config=config,
         )
         # Widen the YouTube tag field too (separate from in-description
         # hashtags) -- channel tags plus topic-specific keywords pulled
