@@ -72,12 +72,17 @@ def _apply_retention_pass(topic: str, script: str) -> str:
 
 def _apply_hook_pass(topic: str, script: str) -> str:
     from src.agents.hook_agent import generate_hooks
+    from src.agents.packaging_agent import score_hook
     hooks = generate_hooks(topic, script, count=8)
     if not hooks:
         return script
 
     def _score(h):
-        return sum(h.get(k, 0) for k in ("clarity", "curiosity", "retention", "science_safety"))
+        hook_text = h.get("hook", "")
+        # Blend AI score with our new deterministic hookscore.py logic
+        ai_score = sum(h.get(k, 0) for k in ("clarity", "curiosity", "retention", "science_safety"))
+        det_score = score_hook(hook_text)
+        return ai_score * 0.4 + det_score * 0.6
 
     best = max(hooks, key=_score)
     best_hook = (best.get("hook") or "").strip()
@@ -100,19 +105,26 @@ def _apply_hook_pass(topic: str, script: str) -> str:
         print("Hook pass: dropped the next sentence because it repeated the new hook.")
         rest_of_script = rest_of_script[nxt.end():]
 
-    print(f"Hook pass: replaced opening with top-scored hook (score={_score(best)}).")
+    print(f"Hook pass: replaced opening with top-scored hook (score={_score(best):.1f}).")
     return f"{best_hook} {rest_of_script}"
 
 
 def _apply_seo_pass(topic: str, script: str, title: str) -> tuple:
     from src.agents.seo_agent import optimize
+    from src.agents.packaging_agent import lint_title_and_thumbnail
     result = optimize(topic, script)
     if not isinstance(result, dict):
         return title, [], []
 
     new_title = (result.get("recommended_title") or "").strip()
     if new_title and len(new_title) <= 100:
-        title = new_title
+        # Lint the title using our packaging linter
+        lint = lint_title_and_thumbnail(new_title)
+        if lint["score"] >= 50:
+            title = new_title
+            print(f"SEO pass: adopted linted title (score={lint['score']}/100): {title}")
+        else:
+            print(f"SEO pass: rejected title due to low packaging score ({lint['score']}/100): {new_title}")
 
     extra_tags = [t for t in result.get("tags", []) if isinstance(t, str) and t.strip()]
     extra_hashtags = [h for h in result.get("hashtags", []) if isinstance(h, str) and h.strip()]
