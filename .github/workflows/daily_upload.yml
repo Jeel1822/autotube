@@ -25,32 +25,23 @@ on:
 jobs:
   run_pipeline:
     runs-on: ubuntu-24.04
+    container:
+      image: jrottenberg/ffmpeg:7.1-ubuntu
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-
-      - name: Install ffmpeg and fonts
+      - name: Install system dependencies
         run: |
-          sudo apt-get update
-          sudo apt-get install -y ffmpeg fonts-freefont-ttf
-          # fonts-freefont-ttf provides FreeSans, which has verified correct
-          # Devanagari shaping via libass/HarfBuzz (used for Hindi captions
-          # and thumbnails). Without this installed, Hindi text can render
-          # with missing vowel signs and no word spacing.
-          #
-          # Jungle Ke Dost mascot art (generate_mascot_assets.py) is
-          # generated once via the Gemini image API and cached under
-          # assets/mascots/ -- that folder must be committed to git (run
-          # a local --dry-run once, then `git add assets/ && git commit`)
-          # so CI reuses the cached PNGs instead of re-generating them
-          # (and burning image-gen quota) on every single run.
+          apt-get update && apt-get install -y python3 python3-pip python3-venv fonts-freefont-ttf
+          # Ensure python environment is usable
+          python3 -m venv /opt/venv
+          export PATH="/opt/venv/bin:$PATH"
 
       - name: Install Python dependencies
-        run: pip install -r requirements.txt
+        run: |
+          export PATH="/opt/venv/bin:$PATH"
+          pip install --break-system-packages -r requirements.txt
 
       - name: Restore pipeline state (avoids repeating topics)
         uses: actions/cache@v4
@@ -81,18 +72,13 @@ jobs:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
         run: |
-          python -m src.main "${{ inputs.channel }}" \
+          export PATH="/opt/venv/bin:$PATH"
+          python3 -m src.main "${{ inputs.channel }}" \
             ${{ inputs.short == 'true' && '--short' || '' }} \
             ${{ inputs.dry_run == 'true' && '--dry-run' || '' }}
 
       # Normal scheduled run — the scheduler decides what's due.
       # ENABLED_CHANNELS restricts this to Cosmic Curious only.
-      # Mind Bites is deliberately excluded (its YouTube token needs
-      # regenerating -- see README/troubleshooting notes -- and uploads to
-      # it are paused until that's resolved). Jungle Ke Dost, Then and Now,
-      # and Money Simple aren't wired up yet either. Add a channel_id here
-      # once its token is restored above and confirmed working (or delete
-      # the ENABLED_CHANNELS line entirely to run all channels).
       - name: Scheduled run
         if: github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.channel == '')
         env:
@@ -100,7 +86,8 @@ jobs:
           PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
           ENABLED_CHANNELS: "cosmic_curious"
         run: |
-          python -m src.scheduler
+          export PATH="/opt/venv/bin:$PATH"
+          python3 -m src.scheduler
 
       - name: Save pipeline state
         if: always()
