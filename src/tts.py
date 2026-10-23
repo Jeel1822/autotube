@@ -114,6 +114,13 @@ def _count_words(text: str) -> int:
 # Edge-TTS synthesis
 # ---------------------------------------------------------------------------
 
+def _apply_natural_breaks(text: str) -> str:
+    """Injects micro-pauses at punctuation to make the AI sound like it's breathing."""
+    # Replace punctuation with the punctuation + a break
+    text = re.sub(r'([.!?])\s+', r'\1 <break time="250ms"/> ', text)
+    text = re.sub(r'(,)\s+', r'\1 <break time="100ms"/> ', text)
+    return text
+
 async def _synthesize(
     text: str,
     voice: str,
@@ -122,20 +129,19 @@ async def _synthesize(
     pitch: str = "+0Hz",
 ) -> list:
     """
-    Generate audio and collect native WordBoundary events.
-
-    Returns a plain list of timing dictionaries.
+    Generate audio and collect native WordBoundary events with injected natural breaks.
     """
+    # Apply natural breathing breaks
+    text = _apply_natural_breaks(text)
 
     communicate = edge_tts.Communicate(
         text,
         voice,
         rate=rate,
         pitch=pitch,
-        # edge-tts 7.x defaults to SentenceBoundary, which this code
-        # ignores. Ask for word-level events explicitly.
         boundary="WordBoundary",
     )
+
 
     word_boundaries = []
 

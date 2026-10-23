@@ -4,10 +4,11 @@ niche: "Science & space facts"
 tone: "conversational, punchy, and authentic — like you're telling a best friend a mind-bending secret about the universe. Use a warm, natural, and human cadence."
 video_length_seconds: 300 # ~5 min long-form
 short_length_seconds: 45
-voice: "en-US-AndrewNeural" # legacy fallback, kept for any code path still using it
-languages: ["en"]
+voice: "en-US-AvaNeural" # Conversational upgrade
+languages: ["en", "hi"]
 voices:
-  en: "en-US-AndrewNeural"
+  en: "en-US-AvaNeural"
+  hi: "hi-IN-SwaraNeural"
 topics_seed_file: "channels/cosmic_curious_topics.txt"
 # Trend Scout: pulls real current signal (r/space top posts this week +
 # recent YouTube search results for the niche) and has Gemini synthesize
