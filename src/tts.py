@@ -115,10 +115,7 @@ def _count_words(text: str) -> int:
 # ---------------------------------------------------------------------------
 
 def _apply_natural_breaks(text: str) -> str:
-    """Injects micro-pauses at punctuation to make the AI sound like it's breathing."""
-    # Replace punctuation with the punctuation + a break
-    text = re.sub(r'([.!?])\s+', r'\1 <break time="250ms"/> ', text)
-    text = re.sub(r'(,)\s+', r'\1 <break time="100ms"/> ', text)
+    """Returns clean text without injected SSML tags, which edge-tts would otherwise speak aloud."""
     return text
 
 async def _synthesize(
@@ -1036,9 +1033,9 @@ def synthesize_speech(
     }
     order = [
         k.strip().lower()
-        for k in os.environ.get("TTS_ORDER", "edge,gemini,azure,local").split(",")
+        for k in os.environ.get("TTS_ORDER", "gemini,edge,azure,local").split(",")
         if k.strip().lower() in providers
-    ] or ["edge", "gemini", "azure", "local"]
+    ] or ["gemini", "edge", "azure", "local"]
 
     word_boundaries = None
     failures = []
