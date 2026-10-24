@@ -65,7 +65,7 @@ category_id: "27" # YouTube category: Education
 # --- Learning loop (channel_sync.py) ---------------------------------------
 # Optional: your YouTube channel id (UC...; Studio > Settings > Channel >
 # Advanced settings). If blank it is auto-detected from the video registry.
-youtube_channel_id: ""
+youtube_channel_id: "UCsQNDNHnE3RhgKB2T9Bol_Q"
 sync_max_age_days: 7        # re-sync real stats / refresh the playbook weekly
 playbook_hit_views: 250     # a Short "hits" at this many views
 short_max_seconds: 75       # anything longer counts as long-form in stats
