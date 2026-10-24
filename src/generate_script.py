@@ -669,7 +669,7 @@ OUTPUT FORMAT:
 
 Respond in EXACTLY this format and nothing else:
 
-TITLE: <punchy YouTube title under 90 characters>
+TITLE: <punchy YouTube title in ENGLISH under 90 characters, ALWAYS write the title in English regardless of script language>
 
 SCRIPT:
 <spoken narration only>
@@ -755,6 +755,7 @@ def generate_script(
     forced_topic: str = None,
     dry_run: bool = False,
     exclude_topics=None,
+    language_override: str = None,
 ) -> dict:
 
     config = load_channel_config(
@@ -792,7 +793,7 @@ def generate_script(
                 topic,
             )
 
-    language = pick_language(
+    language = language_override or pick_language(
         config
     )
 

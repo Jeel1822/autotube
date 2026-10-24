@@ -146,10 +146,10 @@ def build_description(title: str, script_text: str, topic: str,
 
 
 def run(channel_id: str, is_short: bool, privacy_status: str = "public",
-        dry_run: bool = False) -> None:
+        dry_run: bool = False, language_override: str = None) -> None:
     config = load_channel_config(channel_id)
     is_kids_channel = config.get("visual_style") == "puppet_animation"
-    print(f"=== Running {config['display_name']} | {'SHORT' if is_short else 'LONG-FORM'} ===")
+    print(f"=== Running {config['display_name']} | {'SHORT' if is_short else 'LONG-FORM'} | Lang: {language_override or 'auto'} ===")
 
     # Pre-flight auth check -- fails fast (~1 second) if the YouTube
     # token is dead, instead of discovering it after a full 10-17 minute
@@ -190,6 +190,7 @@ def run(channel_id: str, is_short: bool, privacy_status: str = "public",
                 result = generate_script(
                     channel_id, is_short=is_short, forced_topic=forced_topic,
                     dry_run=dry_run, exclude_topics=rejected_topics,
+                    language_override=language_override,
                 )
                 if not is_short and not dry_run:
                     # Record today's long-form topic so the next Short run
@@ -412,10 +413,12 @@ if __name__ == "__main__":
                          choices=["public", "unlisted", "private"])
     parser.add_argument("--dry-run", action="store_true",
                          help="Build the video but don't upload — saves locally instead")
+    parser.add_argument("--language", default=None,
+                         help="Language code override (e.g. en, hi)")
     args = parser.parse_args()
 
     try:
-        run(args.channel_id, args.short, args.privacy, args.dry_run)
+        run(args.channel_id, args.short, args.privacy, args.dry_run, language_override=args.language)
     except Exception:
         print("PIPELINE FAILED:", file=sys.stderr)
         traceback.print_exc()

@@ -9,6 +9,7 @@ def optimize(topic: str, script: str) -> dict:
 
 TITLE RULES (this channel's best titles were short, concrete and plain):
 - Under 60 characters, one concrete surprising claim.
+- ALWAYS return the title in ENGLISH, regardless of the script's language.
 - No unexplained technical terms (no "sublimation", "Roche lobe",
   "eccentricity", "metallicity", "volatiles"). Say it the way you would to a
   friend.

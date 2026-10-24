@@ -167,24 +167,27 @@ def main():
 
         for slot_id, is_short in jobs_due:
             ran_any = True
-            label = "SHORT" if is_short else "LONG-FORM"
-            print(f"\n### {channel_id} — {label} due (slot {slot_id}, now {now.strftime('%H:%M')} UTC) ###\n")
-            cmd = [sys.executable, "-m", "src.main", channel_id]
-            if is_short:
-                cmd.append("--short")
+            languages = config.get("languages", ["en"])
 
-            result = subprocess.run(cmd)
-            if result.returncode != 0:
-                print(f"WARNING: {channel_id} {label} run failed (exit {result.returncode}); "
-                      f"NOT marking slot done, so it will retry next tick instead of being lost.",
-                      file=sys.stderr)
-                # Deliberately don't sys.exit here — one channel failing
-                # shouldn't block the others in the same hourly tick.
-                continue
+            for lang in languages:
+                label = f"{'SHORT' if is_short else 'LONG-FORM'} [{lang.upper()}]"
+                print(f"\n### {channel_id} — {label} due (slot {slot_id}, now {now.strftime('%H:%M')} UTC) ###\n")
 
-            _mark_slot_done(channel_id, state, slot_id)
-            if not is_short:
-                _mark_longform_ran(channel_id, today)
+                cmd = [sys.executable, "-m", "src.main", channel_id, "--language", lang]
+                if is_short:
+                    cmd.append("--short")
+
+                result = subprocess.run(cmd)
+                if result.returncode != 0:
+                    print(f"WARNING: {channel_id} {label} run failed (exit {result.returncode}); "
+                          f"NOT marking slot done, so it will retry next tick instead of being lost.",
+                          file=sys.stderr)
+                    # Break here so we don't proceed to mark the slot done if one language fails
+                    break
+            else:
+                _mark_slot_done(channel_id, state, slot_id)
+                if not is_short:
+                    _mark_longform_ran(channel_id, today)
 
     if not ran_any:
         print(f"Nothing due at {now.strftime('%H:%M')} UTC. Nothing to do.")
