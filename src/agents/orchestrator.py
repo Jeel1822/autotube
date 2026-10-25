@@ -83,7 +83,7 @@ def generate_text(
             return generate(
                 prompt,
                 max_output_tokens=max_output_tokens,
-                model=model or "gemini-3.5-flash-lite",
+                model=model or "gemini-3.5-flash",
                 json_mode=json_mode,
             )
         except Exception as exc:

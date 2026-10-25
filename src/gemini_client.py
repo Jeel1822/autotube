@@ -10,7 +10,7 @@ from google import genai
 from google.genai import types
 
 
-GEMINI_MODEL = "gemini-3.5-flash-lite"
+GEMINI_MODEL = "gemini-flash-lite-latest"
 
 
 def get_client():
@@ -25,7 +25,7 @@ def get_client():
 # Fallback models tried if the primary stays overloaded (comma-separated env override).
 FALLBACK_MODELS = [
     m.strip()
-    for m in os.environ.get("GEMINI_FALLBACK_MODELS", "gemini-1.5-flash,gemini-2.0-flash-exp,gemini-3.1-flash-lite,gemini-3.8-flash,gemini-3.5-flash-lite").split(",")
+    for m in os.environ.get("GEMINI_FALLBACK_MODELS", "gemini-flash-lite-latest,gemini-flash-latest,gemini-3.5-flash-lite,gemini-3.5-flash").split(",")
     if m.strip()
 ]
 
