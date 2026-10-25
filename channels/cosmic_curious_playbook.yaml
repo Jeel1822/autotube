@@ -38,12 +38,12 @@ fails:
   - "Famous textbook facts with no strange concrete consequence also flop: 'What if Earth stopped spinning?' (1 view), 'Why the Moon is slowly leaving Earth' (2), 'Why Mars sunsets are blue' (1), 'Why a day on Venus is longer than its year' (1). Familiar is not enough; it needs a surprising consequence."
   - "Re-doing the same subject or title again and again (3 asteroid variants, 5 Saturn-ring videos in a week, the same dust-grain title twice): the repeats split the audience and did worse than the first."
   - "Long-form: 13 videos have earned 133 views in total (median 2). Do not publish long-form until Shorts bring an audience; every long-form slot also takes the day's #1 ranked topic."
-  - "Publishing 4+ Shorts a day: median 4-5 views and a 9-10% hit rate, vs median ~206 and 45% on days with 1-3 uploads (partly confounded with channel growth over time). Keep to 3 a day or fewer."
+  - "Publishing 4+ Shorts a day: median 4-5 views and a 9-10% hit rate, vs median ~206 and 45% on days with 1-3 uploads (partly confounded with channel growth over time). Keep to 2 a day maximum."
 generation_mix:
-  - "Of the 30 candidates, at least 10 must open as a first-person scene ('Walking on...', 'Standing on...', 'Floating above...', 'Falling into...') on a real, named object."
+  - "Of the 30 candidates, at least 10 must open as a first-person scene ('What it feels like to...', 'I tried walking on...', 'My experience on...') on a real, named object."
   - "At least 6 must hinge on an everyday object or sensation (a compass, glass, rain, diamonds, sound, a rocket, your body)."
   - "At least 4 must be a hidden / secret / missing-object idea (a second Earth, a temporary moon, a galaxy missing its stars)."
-  - "Never open a topic with 'How'. Keep each topic to 8 words or fewer."
+  - "Never open a topic with 'How' or 'Why'. Keep each topic to 8 words or fewer."
 
 # ---- Deterministic filter (src/agents/content_filter.py) -------------------
 filter:
@@ -52,8 +52,9 @@ filter:
   reject_colon_titles: false   # colon titles showed no effect (median 5 vs 5)
   reject_prefixes:             # case-insensitive "starts with"
     - "how "
+    - "why "
   boost:                       # tags sort matching candidates first (the Science Guardian only sees the first 15)
-    first_person: ["walking on", "walking across", "standing on", "standing in", "standing inside", "floating", "orbiting", "drifting", "falling into", "falling through", "swimming", "diving into", "flying through", "riding", "sliding", "gliding", "surfing", "breathing"]
+    first_person: ["what it feels like to", "i tried walking on", "my experience on", "standing on", "standing in", "standing inside", "floating", "orbiting", "drifting", "falling into", "falling through", "swimming", "diving into", "flying through", "riding", "sliding", "gliding", "surfing", "breathing"]
     everyday_object: [compass, glass, diamond, rocket, comet, asteroid, ice, "rain", "moon", "sound", "sounds", "hear", "ocean", "lightning", "air", "your body", "blood", "eyes"]
     hidden_object: [secret, hidden, temporary, "second earth", "twin", missing, invisible]
   jargon_terms:
