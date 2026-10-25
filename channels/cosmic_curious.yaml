@@ -50,7 +50,8 @@ longform_interval_days: 2 # every other day, not daily (only used when longform_
 longform_enabled: false
 # Reduced from 8/day to 3/day to 2/day (Oct 2026): volume was outrunning quality and
 # reach had collapsed. Raise again only once Shorts retention is healthy.
-shorts_upload_times_utc: ["09:00", "18:00"]
+# Add an extra slot for immediate trend-jacking triggers
+shorts_upload_times_utc: ["09:00", "12:00", "15:00", "18:00"]
 tags:
   [
     "space facts",
