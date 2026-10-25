@@ -4,7 +4,11 @@ from src.agents.orchestrator import run_json_batch
 def concepts(topic: str, script: str, count: int = 5) -> list[dict]:
     result = run_json_batch(
         "Thumbnail Director",
-        "Design high-contrast, curiosity-driven thumbnails that accurately represent the video.",
+        "Design high-contrast, curiosity-driven thumbnails that accurately represent the video. Use visual cues that stop the scroll: "
+        "1. IMPOSSIBLE CONTRAST: Show two objects that shouldn't be side-by-side. "
+        "2. MICRO-POV: Use a 'camera' angle looking at a massive object from inches away. "
+        "3. RAW DATA: Prefer raw, authentic telescope/probe photos over polished 3D renders. "
+        "4. BOLD BANNER TEXT: Keep text to 4 words max. Contrast is king.",
         f'''Create {count} thumbnail concepts.
 TOPIC: {topic}
 SCRIPT: {script}

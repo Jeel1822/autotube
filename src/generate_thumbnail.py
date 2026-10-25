@@ -25,16 +25,14 @@ from pathlib import Path
 FONT_NAME = "FreeSans"
 
 # High-CTR color schemes, rotated per video for visual variety across a
-# channel's thumbnail grid (same reason big channels don't reuse one
-# template every time -- a uniform look becomes easy to scroll past).
+# channel's thumbnail grid. High contrast is more important than "beauty".
 # ASS colors are &HAABBGGRR (alpha, then BGR -- reverse of normal RGB hex).
-# BorderStyle 3 = opaque box behind the text using BackColour, which is
-# what gives the bold "banner" look instead of a faint outline.
 THUMBNAIL_SCHEMES = [
-    {"text": "&H0000FFFF", "bg": "&H000022E6"},  # yellow text / red-orange banner
-    {"text": "&H00FFFFFF", "bg": "&H00C81414"},  # white text / deep red banner
-    {"text": "&H0000FFFF", "bg": "&H00A02020"},  # yellow text / dark blue-red banner
-    {"text": "&H00FFFFFF", "bg": "&H0000A5FF"},  # white text / orange banner
+    {"text": "&H0000FFFF", "bg": "&H000000FF"},  # bright yellow text / deep red banner
+    {"text": "&H0000FFFF", "bg": "&H000022E6"},  # yellow text / orange-red banner
+    {"text": "&H00FFFFFF", "bg": "&H00C81414"},  # white text / red banner
+    {"text": "&H0000FFFF", "bg": "&H00A02020"},  # yellow text / dark blue banner
+    {"text": "&H00000000", "bg": "&H0000FFFF"},  # black text / bright yellow banner (The "Science Warning" look)
 ]
 
 
