@@ -44,6 +44,7 @@ generation_mix:
   - "At least 6 must hinge on an everyday object or sensation (a compass, glass, rain, diamonds, sound, a rocket, your body)."
   - "At least 4 must be a hidden / secret / missing-object idea (a second Earth, a temporary moon, a galaxy missing its stars)."
   - "Never open a topic with 'How' or 'Why'. Keep each topic to 8 words or fewer."
+  - "Every candidate MUST be framed as an active, first-person scene or sensory action (e.g., 'Standing on...', 'Floating above...', 'Falling through...')."
 
 # ---- Deterministic filter (src/agents/content_filter.py) -------------------
 filter:

@@ -156,6 +156,16 @@ def main():
             if short_slot_id not in done_slots and _time_to_minutes(t) <= now_minutes:
                 jobs_due.append((short_slot_id, True))
 
+        # Enforce strict maximum 1-3 uploads per day limit automatically.
+        # If more than 3 slots are due across the day or in the queue, cap at 3 max per calendar day.
+        # Also ensure we only run up to 3 slots total per channel per day.
+        today_runs = len(done_slots)
+        if today_runs >= 3:
+            jobs_due = []
+        elif len(jobs_due) + today_runs > 3:
+            allowed_count = 3 - today_runs
+            jobs_due = jobs_due[:allowed_count]
+
         # Never publish more than one video per channel per hourly tick. After
         # an outage (expired token, failed run) every missed slot is "due" at
         # once, and publishing them all back-to-back is a burst of

@@ -23,13 +23,13 @@ def find_topics(
 
     result = run_json_batch(
         "Topic Hunter",
-        "Find original, high-retention science/space ideas without copying source titles.",
+        "Find original, high-retention science/space ideas. Force first-person scene openers on real objects.",
         f"""
 Generate exactly {count} candidate topics.
 
 Each item must contain:
 {{
-  "topic": "plain-language title, 4-8 words, never starting with 'How'",
+  "topic": "first-person scene title, 4-8 words, NEVER starting with 'How' or 'Why'",
   "curiosity": 1,
   "novelty": 1,
   "visual": 1,
@@ -42,18 +42,15 @@ Return JSON object:
 
 {playbook_block}
 
-Audience: mostly adults 35+, mostly US, watching on phones. Favor
-first-person scenes on a real object, sound, scale, danger, hidden or
-secret objects, and things they can relate to Earth or their own body.
-A famous fact alone is not enough: it needs a strange, concrete
-consequence the viewer can picture in one reading.
+Audience: adults 35+, watching on phones.
 
-Use recent signals as inspiration, not as titles to copy.
-Reject generic facts, listicles, unsupported mysteries, fake NASA claims,
-and recycled ideas.
+CRITICAL REQUIREMENT - FIRST-PERSON SCENES:
+Every candidate topic MUST be framed as an active, first-person scene or immediate sensory action on a real physical object/environment.
+- REQUIRED OPENINGS: Use scene openers such as "Walking on...", "Standing on...", "Floating above...", "Falling through...", "Falling into...", "Diving into...", "Breathing on...", "Riding a...".
+- Picture a real person (the viewer) actually there experiencing one strange, concrete consequence.
 
-RECENT SIGNALS:
-{signals}
+STRICT RULE / BANNED PREFIXES:
+- NEVER start a topic with "How" or "Why" under any circumstances.
 
 ALREADY USED CHANNEL TOPICS:
 {used}
