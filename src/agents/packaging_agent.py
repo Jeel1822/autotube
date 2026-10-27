@@ -67,7 +67,7 @@ def score_hook(t: str) -> int:
 
 
 def lint_title_and_thumbnail(title: str, thumb: str = None) -> dict:
-    """ lints a title and thumbnail pairing using the yt-package logic."""
+    """ lints a title and thumbnail pairing using the updated Cosmic Curious growth rules."""
     t = title.strip()
     n = len(t)
     issues, good = [], []
@@ -75,12 +75,30 @@ def lint_title_and_thumbnail(title: str, thumb: str = None) -> dict:
     elif n > 60: issues.append(("length", f"{n} characters - desktop search cuts near 60"))
     else: good.append(f"{n} characters, inside desktop cut")
 
+    # Check for banned "How" or "Why" prefixes (5.9% hit rate)
+    if t.lower().startswith(("how ", "why ")):
+        issues.append(("banned_prefix", "Title starts with 'How' or 'Why' (low-performing pattern)"))
+    else:
+        good.append("avoids 'How/Why' openers")
+
+    # Check for First-Person or Everyday Objects (high hit rate)
+    first_person_keywords = ["walking", "standing", "floating", "falling", "diving", "orbiting", "drifting"]
+    everyday_objects = ["compass", "glass", "diamond", "rocket", "comet", "asteroid", "ice", "rain", "moon", "sound", "blood", "eyes"]
+
+    has_fp = any(k in t.lower() for k in first_person_keywords)
+    has_eo = any(k in t.lower() for k in everyday_objects)
+
+    if has_fp:
+        good.append("contains high-performing first-person action")
+    if has_eo:
+        good.append("contains everyday object anchor")
+
     v = [w for w in words(t) if w in VAGUE]
     if v: issues.append(("vague", f"{', '.join(sorted(set(v)))} - swap for a number or name"))
 
     nums = re.findall(r"\d[\d,.]*%?", t)
     if nums: good.append(f"carries concrete figure ({', '.join(nums[:3])})")
-    else: issues.append(("no-number", "no number, date or name"))
+    elif not has_fp and not has_eo: issues.append(("no-number", "no number, date, first-person action or everyday object"))
 
     if thumb:
         tw, hw = set(words(t)) - {"the","a","an","of","for","to","in","on","and","or","is","are","with","your","you","my","i","this","that","it","how","what","why"}, set(words(thumb)) - {"the","a","an","of","for","to","in","on","and","or","is","are","with","your","you","my","i","this","that","it","how","what","why"}
@@ -90,5 +108,5 @@ def lint_title_and_thumbnail(title: str, thumb: str = None) -> dict:
         else:
             good.append("thumbnail and title carry different words")
 
-    score = max(0, min(100, 100 - 14 * len(issues) + 4 * len(good)))
+    score = max(0, min(100, 100 - 14 * len(issues) + 6 * len(good)))
     return {"title": t, "score": score, "issues": issues, "good": good}
