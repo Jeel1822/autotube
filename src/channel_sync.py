@@ -363,11 +363,19 @@ def sync_channel(channel_id: str, config: dict, playbook: dict = None):
         snap["youtube_channel_id"] = yt_id
         _write_json(_state(channel_id, "performance_snapshot.json"), snap)
 
-        base = snap["baseline"]
-        print(f"Channel sync: {len(videos)} uploads, {added} added to the "
-              f"registry; {snap['n_shorts_measured']} mature Shorts, "
-              f"{base['hit_rate']:.0%} reach {snap['hit_views']}+ views "
-              f"(median {base['median']}).")
+        # Run retention_critic post-mortem on recent videos if we have snapshot data
+        if snap and snap.get("views_by_id"):
+            try:
+                from src.agents.retention_critic import run_post_mortem
+                views_map = snap["views_by_id"]
+                hit_thresh = snap.get("hit_views", 250)
+                # Pick the 3 most recent videos to audit
+                for v in videos[:3]:
+                    vid = v["video_id"]
+                    if vid in views_map:
+                        run_post_mortem(channel_id, vid, v["title"], views_map[vid], hit_thresh)
+            except Exception as e:
+                print(f"WARNING: retention_critic post-mortem failed ({e}).")
         for w in snap["rule_warnings"]:
             print(f"  WARNING: {w}")
         return snap
