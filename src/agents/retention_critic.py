@@ -4,7 +4,7 @@ Analyzes the latest video performance and writes immediate, actionable
 growth lessons into the channel memory.
 """
 from src.agents.orchestrator import run_json_batch
-from src.agents.memory import save_memory
+from src.agents.memory import remember
 
 def run_post_mortem(channel_id: str, video_id: str, title: str, views: int, hit_threshold: int):
     """
@@ -41,7 +41,7 @@ Return:
 
     if result and isinstance(result, dict) and "lesson" in result:
         # Save this to performance_lessons memory for the CEO agent
-        save_memory(channel_id, "performance_lessons", result["lesson"])
+        remember(channel_id, "performance_lessons", result["lesson"])
         print(f"Post-Mortem Lesson Saved: {result['lesson']}")
         return result
     return None
