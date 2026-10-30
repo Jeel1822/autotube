@@ -371,6 +371,16 @@ def run(channel_id: str, is_short: bool, privacy_status: str = "public",
             editorial_title, script_text, topic,
             config["tags"] + extra_tags, is_short, config=config,
         )
+
+        # Tier 1 Revenue: Contextual Affiliate Injection
+        from src.agents.revenue_agent import inject_affiliate_cta
+        description, affiliate_cat = inject_affiliate_cta(script_text, description)
+
+        # Tier 2 Revenue: Archive to Cosmos Vault
+        if not is_short: # Focus vaulting on long-form / high-value assets
+            from src.agents.revenue_agent import archive_master_asset
+            archive_master_asset(channel_id, topic, script_text, {"affiliate_cat": affiliate_cat})
+
         # Widen the YouTube tag field too (separate from in-description
         # hashtags) -- channel tags plus topic-specific keywords pulled
         # from the title, for better search matching per video.
