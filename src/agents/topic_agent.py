@@ -44,13 +44,13 @@ Return JSON object:
 
 Audience: adults 35+, watching on phones.
 
-CRITICAL REQUIREMENT - FIRST-PERSON SCENES:
-Every candidate topic MUST be framed as an active, first-person scene or immediate sensory action on a real physical object/environment.
-- REQUIRED OPENINGS: Use scene openers such as "Walking on...", "Standing on...", "Floating above...", "Falling through...", "Falling into...", "Diving into...", "Breathing on...", "Riding a...".
-- Picture a real person (the viewer) actually there experiencing one strange, concrete consequence.
-
-STRICT RULE / BANNED PREFIXES:
-- NEVER start a topic with "How" or "Why" under any circumstances.
+CRITICAL REQUIREMENT - SPATIAL PARADOX FORMULA:
+Every candidate topic MUST follow our 1,000+ view blueprint:
+1. FIRST-PERSON LOCATION: Must place the viewer's body in an impossible physical location ("Walking on...", "Standing on...", "Floating inside...").
+2. EVERYDAY OBJECT ANCHOR: Must contrast cosmic scale with a hyper-familiar object (a strawberry, coffee, a ring, glass, a compass).
+3. SENSORY CONSONANCE: Must imply a direct physical sensation (weight, sound, smell, dropping).
+- NEVER start a topic with "How" or "Why".
+- Keep titles to 4-8 words.
 
 ALREADY USED CHANNEL TOPICS:
 {used}
