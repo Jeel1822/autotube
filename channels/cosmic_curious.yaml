@@ -48,10 +48,9 @@ longform_interval_days: 2 # every other day, not daily (only used when longform_
 # and every long-form run also consumed the day's #1 ranked topic. Re-enable
 # (true) once Shorts reach a steady audience.
 longform_enabled: false
-# Reduced from 8/day to 3/day to 2/day (Oct 2026): volume was outrunning quality and
-# reach had collapsed. Raise again only once Shorts retention is healthy.
-# Add an extra slot for immediate trend-jacking triggers
-shorts_upload_times_utc: ["12:00", "18:00"]
+# Optimized cadence: 3 slots spaced throughout the day (Peak hours).
+# Balancing volume with retention quality.
+shorts_upload_times_utc: ["09:00", "13:00", "18:00"]
 tags:
   [
     "space facts",
