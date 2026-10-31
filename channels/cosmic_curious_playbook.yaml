@@ -34,8 +34,8 @@ patterns:
   - "One strange claim per Short. State the weird thing in the first line, in plain words."
 fails:
   - "Titles that open with 'How ...' (mechanism titles): only 2 of 51 reached 250 views (4%) vs 15% for other openers. Rephrase as a scene or a plain claim."
-  - "Abstract jargon the viewer must already know (Roche lobe, accretion, frame-dragging, planetary nebula, protoplanetary disk, nuclear pasta, magnetic fields, binary stars, tidal locking, Chandrasekhar): ~0 of 40 reached 250 views."
-  - "Famous textbook facts with no strange concrete consequence also flop: 'What if Earth stopped spinning?' (1 view), 'Why the Moon is slowly leaving Earth' (2), 'Why Mars sunsets are blue' (1), 'Why a day on Venus is longer than its year' (1). Familiar is not enough; it needs a surprising consequence."
+  - "Abstract hypothetical gravity scenarios on Mars or other planets must be anchored to a tangible, everyday comparison (e.g., comparing weight to a strawberry or coffee) or they will be rejected."
+  - "Avoid multi-layered everyday object comparisons that require complex mental math; keep the analogy direct and singular."
   - "Re-doing the same subject or title again and again (3 asteroid variants, 5 Saturn-ring videos in a week, the same dust-grain title twice): the repeats split the audience and did worse than the first."
   - "Long-form: 13 videos have earned 133 views in total (median 2). Do not publish long-form until Shorts bring an audience; every long-form slot also takes the day's #1 ranked topic."
   - "Publishing 4+ Shorts a day: median 4-5 views and a 9-10% hit rate, vs median ~206 and 45% on days with 1-3 uploads (partly confounded with channel growth over time). Keep to 2 a day maximum."
