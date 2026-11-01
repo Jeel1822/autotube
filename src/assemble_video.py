@@ -22,9 +22,9 @@ def _get_audio_duration(audio_path: str) -> float:
     return float(out.stdout.strip())
 
 
-def _build_caption_chunks(timing_path: str, words_per_caption: int = 3) -> list:
+def _build_caption_chunks(timing_path: str, words_per_caption: int = 2) -> list:
     """Groups word-level timings into short caption chunks: [(start, end, text), ...]
-    Using 3 words per chunk for ultra-punchy, fast-paced retention on Shorts."""
+    Using 2 words per chunk for ultra-punchy, fast-paced retention on Shorts."""
     words = json.loads(Path(timing_path).read_text())
     chunks = []
     for i in range(0, len(words), words_per_caption):
