@@ -183,12 +183,13 @@ def generate_thumbnail(
 
         duration = _get_video_duration(video_path)
 
-        width, height = (1080, 1920) if portrait else (1280, 720)
-        # Larger than before (was 90/64) -- bold banner text needs to read
-        # clearly even at small mobile thumbnail sizes.
-        font_size = 110 if portrait else 78
+        from src.agents.thumbnail_master_skill import enhance_thumbnail_text
 
-        short_text = override_text or _shorten_for_thumbnail(title, language)
+        width, height = (1080, 1920) if portrait else (1280, 720)
+        font_size = 120 if portrait else 86
+
+        raw_text = override_text or _shorten_for_thumbnail(title, language)
+        short_text = enhance_thumbnail_text(raw_text, language)
         scheme = random.choice(THUMBNAIL_SCHEMES)
 
         short_text, font_size = _wrap_and_fit(short_text, width, font_size)
