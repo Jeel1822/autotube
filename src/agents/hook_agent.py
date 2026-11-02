@@ -26,6 +26,4 @@ Winning patterns for this channel:
 Return {{"hooks":[{{"hook":"...","clarity":1,"curiosity":1,"retention":1,"science_safety":1}}]}}.''',
         max_output_tokens=1800,
     )
-        max_output_tokens=1800,
-    )
     return result.get("hooks", []) if isinstance(result, dict) else []
