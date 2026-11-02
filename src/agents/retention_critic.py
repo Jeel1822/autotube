@@ -16,25 +16,29 @@ def run_post_mortem(channel_id: str, video_id: str, title: str, views: int, hit_
 
     result = run_json_batch(
         "Retention Critic",
-        "Perform a post-mortem on the latest video performance to extract growth lessons.",
+        "Perform a high-standard post-mortem on the latest video performance to extract elite growth lessons.",
         f"""
 Analyze the performance of this video:
 Title: {title}
 Views: {views}
-Status: {'HIT' if is_hit else 'DROP'} (Threshold: {hit_threshold})
+Status: {'ELITE HIT' if is_hit else 'UNDERPERFORMER'} (Threshold: {hit_threshold})
 
 Task:
-1. If it was a HIT, identify which winning pattern it used (First-Person, Everyday Object, etc.)
-   and why it resonated.
-2. If it was a DROP, identify what felt 'off' (Too abstract, jargon, boring opener,
-   'How/Why' mechanism).
-3. Write exactly ONE clear, short 'performance_lesson'.
+1. If it was an ELITE HIT, rigorously identify the specific viral triggers:
+   - What was the 'Psychological Friction' in the first 2 seconds?
+   - What specific 'FAVOR' rule can we write to replicate this success?
+2. If it was an UNDERPERFORMER, diagnose the specific point of failure:
+   - Was the hook too academic?
+   - Was the visual anchor missing?
+   - Write a sharp 'AVOID' rule.
+3. Your lesson must be surgical and actionable.
 
 Return:
 {{
-  "lesson": "One sentence growth rule starting with 'FAVOR' or 'AVOID'",
-  "confidence": 0.9,
-  "pattern_detected": "..."
+  "lesson": "One sentence growth rule starting with 'FAVOR' (for elite hits) or 'AVOID' (for underperformers)",
+  "confidence": 0.95,
+  "pattern_detected": "...",
+  "viral_trigger": "..."
 }}
 """
     )
