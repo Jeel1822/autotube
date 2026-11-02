@@ -12,40 +12,13 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 DATA_DIR = ROOT / "src" / "data"
 
-# Niche affiliate mappings with intent keywords
-AFFILIATE_CATALOG = {
-    "telescope": {
-        "keywords": ["moon", "saturn", "rings", "crater", "star", "galaxy", "nebula"],
-        "link_template": "https://autotube.store/gear/pro-telescope",
-        "cta": "🔭 Want to see this yourself? Check out the recommended beginner telescope:"
-    },
-    "space_map": {
-        "keywords": ["constellation", "milky way", "sun", "solar system", "orbit"],
-        "link_template": "https://autotube.store/gear/cosmic-map",
-        "cta": "🌌 Map the universe from your wall. High-res Cosmic Chart:"
-    },
-    "audio_gear": {
-        "keywords": ["sound", "hear", "whistle", "lightning", "atmosphere"],
-        "link_template": "https://autotube.store/gear/studio-headphones",
-        "cta": "🎧 Experience space audio in full fidelity:"
-    }
-}
+# Affiliate catalog disabled (no external store active)
+AFFILIATE_CATALOG = {}
 
 def inject_affiliate_cta(script_text: str, description_text: str) -> tuple[str, str | None]:
     """
-    Scans script for high-intent keywords and appends a relevant,
-    non-intrusive affiliate link to the YouTube description.
+    Affiliate injection disabled. Returns clean description.
     """
-    low_script = script_text.lower()
-
-    for category, details in AFFILIATE_CATALOG.items():
-        for kw in details["keywords"]:
-            if re.search(rf"\b{re.escape(kw)}\b", low_script):
-                cta_block = f"\n\n{details['cta']}\n{details['link_template']}"
-                updated_description = description_text + cta_block
-                print(f"[REVENUE ENGINE] Contextual CTA Injected: {category} (keyword: {kw})")
-                return updated_description, category
-
     return description_text, None
 
 def archive_master_asset(channel_id: str, topic: str, script: str, metadata: dict):
