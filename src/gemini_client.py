@@ -44,7 +44,7 @@ def _is_transient(exc: Exception) -> bool:
 # model -> monotonic time until which it is considered down (circuit breaker),
 # so one overloaded model doesn't cost ~40s of retries on every single call.
 _DOWN_UNTIL: dict = {}
-_COOLDOWN_SECONDS = 300
+_COOLDOWN_SECONDS = 120
 
 
 _GONE = ("404", "not_found", "no longer available", "not found", "is not supported")
@@ -58,12 +58,13 @@ def _is_model_gone(exc: Exception) -> bool:
 
 
 def send_with_retry(prompt, model: str = GEMINI_MODEL, config=None,
-                    attempts_per_model: int = 2):
+                    attempts_per_model: int = 4):
     """Send a prompt, retrying transient errors (503/429/...) briefly per
     model, then falling back to FALLBACK_MODELS. A model that exhausts its
-    retries is skipped for 5 minutes. Non-transient errors raise immediately."""
+    retries is skipped for 2 minutes. Non-transient errors raise immediately."""
     client = get_client()
     all_models = [model] + [m for m in FALLBACK_MODELS if m != model]
+    random.shuffle(all_models)
     now = time.monotonic()
     models = [m for m in all_models if _DOWN_UNTIL.get(m, 0) <= now] or all_models
     last_exc = None
