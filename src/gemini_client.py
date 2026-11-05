@@ -107,11 +107,14 @@ def generate(
     model: str = GEMINI_MODEL,
     json_mode: bool = False,
 ) -> str:
-    """Generate text using Gemini chat.
-
-    json_mode=True asks Gemini for syntactically valid JSON output
-    (response_mime_type), which prevents corrupted keys like s"afe_framing".
-    """
+    """Generate text using Gemini, with instant fallback to Groq if GROQ_API_KEY is present or Gemini fails."""
+    # Try Groq first if key is available, as it is lightning fast and never 503s on free tier
+    if os.environ.get("GROQ_API_KEY"):
+        try:
+            from src.groq_client import generate as groq_generate
+            return groq_generate(prompt, json_mode=json_mode)
+        except Exception as e:
+            print(f"Groq generation failed ({e}); falling back to Gemini.", flush=True)
 
     config = None
 
@@ -123,14 +126,23 @@ def generate(
             kwargs["response_mime_type"] = "application/json"
         config = types.GenerateContentConfig(**kwargs)
 
-    response = send_with_retry(prompt, model=model, config=config)
+    try:
+        response = send_with_retry(prompt, model=model, config=config)
+        text = getattr(response, "text", None)
+        if text:
+            return text.strip()
+    except Exception as gemini_exc:
+        # If Gemini exhausts retries and Groq key is available (or even if not, try groq as last resort)
+        if os.environ.get("GROQ_API_KEY"):
+            try:
+                from src.groq_client import generate as groq_generate
+                print(f"Gemini failed ({gemini_exc}); falling over to Groq Llama 3.", flush=True)
+                return groq_generate(prompt, json_mode=json_mode)
+            except Exception as groq_exc:
+                raise RuntimeError(f"Both Gemini and Groq failed. Gemini: {gemini_exc}, Groq: {groq_exc}") from gemini_exc
+        raise
 
-    text = getattr(response, "text", None)
-
-    if not text:
-        raise RuntimeError("Gemini returned an empty response.")
-
-    return text.strip()
+    raise RuntimeError("Gemini returned an empty response.")
 
 
 def generate_response(
