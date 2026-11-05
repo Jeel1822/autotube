@@ -21,6 +21,14 @@ def find_topics(
         "Avoid topics built on unexplained jargon."
     )
 
+    # Load evolution-tier directives if present
+    from src.agents.memory import load_memory
+    memory = load_memory(channel_id)
+    evolution_block = ""
+    if memory.get("evolution_directives"):
+        directive_data = memory.get("evolution_directives", {})
+        evolution_block = f"\nACTIVE SYSTEM EVOLUTION DIRECTIVE:\n{directive_data.get('directive', '')}\n"
+
     result = run_json_batch(
         "Topic Hunter",
         "Find original, high-retention science/space ideas. Force first-person scene openers on real objects.",
@@ -41,7 +49,7 @@ Return JSON object:
 {{"topics": [ ... ]}}
 
 {playbook_block}
-
+{evolution_block}
 Audience: adults 35+, watching on phones.
 
 CRITICAL REQUIREMENT - SPATIAL PARADOX FORMULA:
