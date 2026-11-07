@@ -14,8 +14,8 @@ The opening sentence MUST state the core claim immediately, with NO scene-settin
 teasing, or wind-up.
 
 STRICT BAN - BANNED OPENERS:
-- STRICTLY BAN starting any hook with "How" or "Why" under any circumstances.
-- Never start with a question ("How do you...", "Why does...").
+- STRICTLY BAN starting any hook with "How", "Why", "What", or "Can" under any circumstances.
+- Never start with a question ("How do you...", "Why does...", "What happens...").
 - Never start with scene-setting ("Ten kilometers beneath...") or teases ("Zoom in closer...").
 
 Winning patterns for this channel:
