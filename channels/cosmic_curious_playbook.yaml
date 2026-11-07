@@ -54,6 +54,8 @@ filter:
   reject_prefixes:             # case-insensitive "starts with"
     - "how "
     - "why "
+    - "what "
+    - "can "
   boost:                       # tags sort matching candidates first (the Science Guardian only sees the first 15)
     first_person: ["what it feels like to", "i tried walking on", "my experience on", "standing on", "standing in", "standing inside", "floating", "orbiting", "drifting", "falling into", "falling through", "swimming", "diving into", "flying through", "riding", "sliding", "gliding", "surfing", "breathing"]
     everyday_object: [compass, glass, diamond, rocket, comet, asteroid, ice, "rain", "moon", "sound", "sounds", "hear", "ocean", "lightning", "air", "your body", "blood", "eyes"]

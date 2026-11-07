@@ -56,6 +56,7 @@ Rules:
 - Do not invent observations, numbers, discoveries, or citations.
 - Use conditional language for hypothetical outcomes.
 - Do not use generic visual queries when a specific visual can be named.
+- STRICT LENGTH: Keep script narration under 100 words.
 - Keep the Short plan compatible with 30-60 seconds.
 """,
         f"CHANNEL: {config['display_name']}\nNICHE: {config['niche']}\nTONE: {config['tone']}",

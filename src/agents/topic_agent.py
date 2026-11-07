@@ -37,7 +37,7 @@ Generate exactly {count} candidate topics.
 
 Each item must contain:
 {{
-  "topic": "first-person scene title, 4-8 words, NEVER starting with 'How' or 'Why'",
+  "topic": "first-person scene title, 4-8 words, NEVER starting with 'How', 'Why', 'What', or 'Can'",
   "curiosity": 1,
   "novelty": 1,
   "visual": 1,
@@ -57,7 +57,7 @@ Every candidate topic MUST follow our 1,000+ view blueprint:
 1. FIRST-PERSON LOCATION: Must place the viewer's body in an impossible physical location ("Walking on...", "Standing on...", "Floating inside...").
 2. EVERYDAY OBJECT ANCHOR: Must contrast cosmic scale with a hyper-familiar object (a strawberry, coffee, a ring, glass, a compass).
 3. SENSORY CONSONANCE: Must imply a direct physical sensation (weight, sound, smell, dropping).
-- NEVER start a topic with "How" or "Why".
+- NEVER start a topic with "How", "Why", "What", or "Can".
 - Keep titles to 4-8 words.
 
 ALREADY USED CHANNEL TOPICS:
