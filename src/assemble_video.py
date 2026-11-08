@@ -22,9 +22,9 @@ def _get_audio_duration(audio_path: str) -> float:
     return float(out.stdout.strip())
 
 
-def _build_caption_chunks(timing_path: str, words_per_caption: int = 2) -> list:
-    """Groups word-level timings into short caption chunks: [(start, end, text), ...]
-    Using 2 words per chunk for ultra-punchy, fast-paced retention on Shorts."""
+def _build_caption_chunks(timing_path: str, words_per_caption: int = 1) -> list:
+    """Groups word-level timings into ultra-short caption chunks (1 word per chunk)
+    for high-impact, Hormozi-style single-word visual pacing."""
     words = json.loads(Path(timing_path).read_text())
     chunks = []
     for i in range(0, len(words), words_per_caption):
@@ -72,7 +72,8 @@ ScaledBorderAndShadow: yes
 
 [V4+ Styles]
 Format: Name, Fontname, Fontsize, PrimaryColour, OutlineColour, BackColour, Bold, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
-Style: Default,Impact,{font_size},&H0000FFFF,&H00000000,&H80000000,1,1,4,2,2,30,30,{margin_v},1
+Style: Default,Impact,{font_size},&H0000FFFF,&H00000000,&H80000000,1,1,5,2,2,30,30,{margin_v},1
+Style: Highlight,Impact,{int(font_size * 1.15)},&H00FF00FF,&H00000000,&H80000000,1,1,5,2,2,30,30,{margin_v},1
 
 [Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
@@ -80,9 +81,10 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
     lines = [header]
     for start, end, text in chunks:
         escaped = _escape_ass_text(text.upper())  # Uppercase text yields higher CTR/retention
+        # Hormozi style: Active word in Highlight style, rest in Default
         lines.append(
             f"Dialogue: 0,{_ass_timestamp(start)},{_ass_timestamp(end)},"
-            f"Default,,0,0,0,,{escaped}\n"
+            f"Highlight,,0,0,0,,{escaped}\n"
         )
     ass_path.write_text("".join(lines), encoding="utf-8")
 

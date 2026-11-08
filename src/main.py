@@ -304,8 +304,8 @@ def run(channel_id: str, is_short: bool, privacy_status: str = "public",
                 from src.fetch_stock import fetch_clips_for_beats
                 beats = build_beats(
                     str(timing_path),
-                    min_seconds=2.0 if is_short else 5.0,
-                    max_seconds=4.5 if is_short else 9.0,
+                    min_seconds=1.2 if is_short else 5.0,
+                    max_seconds=2.2 if is_short else 9.0,
                 )
                 beats = plan_queries(beats, topic, config.get("niche", "science and space facts"))
                 clip_paths, clip_durations = fetch_clips_for_beats(

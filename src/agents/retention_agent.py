@@ -13,6 +13,7 @@ SCRIPT: {script}
 
 Rewrite it to sound like a genuine person explaining this to a friend,
 not a documentary narrator or an AI reading a Wikipedia summary. Concretely:
+- CRITICAL: Rewrite the conclusion of the script to seamlessly loop back into the first sentence of the hook, creating an infinite retention loop.
 - Use contractions (it's, that's, you'd, don't) -- avoid "it is", "that is"
 - Vary sentence length -- mix short punchy sentences with longer ones,
   the way people actually talk, not uniform textbook-length sentences

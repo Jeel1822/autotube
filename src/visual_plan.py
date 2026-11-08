@@ -30,8 +30,8 @@ _FILLER = {
 }
 
 
-def build_beats(timing_path: str, min_seconds: float = 2.0,
-                max_seconds: float = 4.5) -> list:
+def build_beats(timing_path: str, min_seconds: float = 1.2,
+                max_seconds: float = 2.2) -> list:
     """
     Group word timings into contiguous beats.
 
