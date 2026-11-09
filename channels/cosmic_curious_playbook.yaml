@@ -11,6 +11,8 @@
 
 # ---- Shown to the Topic Hunter and Chief Editor prompts --------------------
 works:
+  - "On Pluto, Water Ice Is as Hard as Granite"                   # 1,016 views (Nov 7)
+  - "Venus Has Mountains Covered in Metal Frost"                 # 977 views (Nov 7)
   - "Walking on a comet would launch you into orbit"             # 1,376 views
   - "Why every rocket wants to launch from the equator"          # 1,251
   - "How quantum fluctuations built the cosmic web"              # 1,240
@@ -26,8 +28,9 @@ works:
   - "What if a second Earth was hiding behind the Sun?"          # 555
   - "Why sunlight takes 100,000 years to escape the Sun"         # 405
 patterns:
+  - "PLANETARY MATERIAL ANOMALIES (water ice as hard as granite, metal frost on Venus, diamond rain, iron planets): direct 1k+ view blueprint."
   - "FIRST-PERSON SCENE openers ('Walking on...', 'Standing on...', 'Floating above...', 'Falling into...') on a real object, ending in ONE surprising consequence: 36% reached 250+ views vs 11% for everything else."
-  - "EVERYDAY-OBJECT anchor (compass, glass, diamonds, rocket, comet, asteroid, ice, rain, the Moon): 30% hit vs 8% without. The viewer should picture it instantly."
+  - "EVERYDAY-OBJECT anchor (granite, metal, compass, glass, diamonds, rocket, comet, asteroid, ice, rain, the Moon): 30% hit vs 8% without. The viewer should picture it instantly."
   - "SHORT titles, 6 words or fewer: 23% hit vs 11%."
   - "A HIDDEN or SECRET object ('secret temporary moon', 'second Earth hiding behind the Sun', a galaxy with almost no stars): 25% hit."
   - "SOUND and SCALE hooks (what it sounds like on Titan, sunlight taking 100,000 years): several of the top 10."
