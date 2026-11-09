@@ -17,9 +17,12 @@ def evolve_strategy(channel_id: str):
 
     # Synthesize new strategic directive
     new_directive = (
-        "EVOLUTION DIRECTIVE: Shift away from abstract spatial mechanics. "
-        "Prioritize 'Sensory-Scale Paradoxes' (e.g., matching a massive cosmic event to an everyday tactile sensation) "
-        "to force a minimum 70% retention rate in the first 5 seconds."
+        "EVOLUTION DIRECTIVE 2.0: 'Tactile Cosmic Anchors'. "
+        "Strictly abandon 3rd-person 'what happens' setups. Every Short must be an "
+        "immediate 'I am' experience: 'I am walking on...', 'My lungs are...', "
+        "'I am holding...'. Retention is won by visceral 'Body-in-Space' paradoxes "
+        "(e.g., 'If I stood here, I would be crushed by the weight of a skyscraper'). "
+        "Targeting 110%+ retention via infinite-loop script structures."
     )
 
     remember(channel_id, "evolution_directives", {
