@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Walking in Lead Rain - 60-Second Short Research & Storyboard</title>
+    <style>
+        :root {
+            --bg-primary: #0a0d14;
+            --bg-secondary: #121824;
+            --bg-card: #192233;
+            --text-primary: #f1f5f9;
+            --text-secondary: #94a3b8;
+            --accent-lead: #64748b;
+            --accent-glow: #f97316;
+            --accent-hot: #ef4444;
+            --accent-cold: #38bdf8;
+            --border: #2a374d;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        }
+
+        body {
+            background-color: var(--bg-primary);
+            color: var(--text-primary);
+            line-height: 1.6;
+            padding: 24px 16px;
+            max-width: 1100px;
+            margin: 0 auto;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 40px;
+            border-bottom: 1px solid var(--border);
+            padding-bottom: 24px;
+        }
+
+        header h1 {
+            font-size: 2.5rem;
+            background: linear-gradient(135deg, #f97316, #ef4444, #94a3b8);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 12px;
+        }
+
+        header p {
+            color: var(--text-secondary);
+            font-size: 1.1rem;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+            gap: 24px;
+            margin-bottom: 40px;
+        }
+
+        .card {
+            background-color: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 24px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.5);
+        }
+
+        .card h2 {
+            font-size: 1.4rem;
+            margin-bottom: 16px;
+            color: var(--accent-glow);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .stat-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+            margin-top: 16px;
+        }
+
+        .stat-box {
+            background-color: var(--bg-card);
+            padding: 12px;
+            border-radius: 8px;
+            border-left: 3px solid var(--accent-glow);
+        }
+
+        .stat-box .label {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .stat-box .value {
+            font-size: 1.25rem;
+            font-weight: bold;
+            color: var(--text-primary);
+            margin-top: 4px;
+        }
+
+        .timeline {
+            margin-top: 40px;
+        }
+
+        .timeline h2 {
+            font-size: 1.8rem;
+            margin-bottom: 24px;
+            text-align: center;
+        }
+
+        .scene-card {
+            background-color: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        @media(min-width: 768px) {
+            .scene-card {
+                flex-direction: row;
+                justify-content: space-between;
+                align-items: center;
+            }
+        }
+
+        .scene-time {
+            background: var(--accent-glow);
+            color: #000;
+            font-weight: bold;
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-size: 0.9rem;
+            width: fit-content;
+            height: fit-content;
+        }
+
+        .scene-content {
+            flex: 1;
+            margin-left: 0;
+        }
+
+        @media(min-width: 768px) {
+            .scene-content {
+                margin-left: 20px;
+            }
+        }
+
+        .scene-content h3 {
+            font-size: 1.2rem;
+            margin-bottom: 6px;
+            color: var(--text-primary);
+        }
+
+        .scene-content p {
+            color: var(--text-secondary);
+            font-size: 0.95rem;
+            margin-bottom: 8px;
+        }
+
+        .visual-cue {
+            font-size: 0.85rem;
+            color: #38bdf8;
+            background: rgba(56, 189, 248, 0.1);
+            padding: 4px 8px;
+            border-radius: 4px;
+            display: inline-block;
+        }
+
+        footer {
+            text-align: center;
+            margin-top: 60px;
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+            border-top: 1px solid var(--border);
+            padding-top: 20px;
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1>Walking on a Planet Where It Rains Molten Lead</h1>
+        <p>60-Second Short Research, Physics Breakdown & Cinematic Storyboard</p>
+    </header>
+
+    <div class="grid">
+        <div class="card">
+            <h2>Planet Profile: WASP-76b (Analog)</h2>
+            <p>While true rocky planets with lead rain are theoretical extremes, ultra-hot gas giants like WASP-76b feature dayside temperatures exceeding 2,400°C (4,350°F) where iron, lead, and refractory elements vaporize, blow to the cooler nightside (1,300°C), and condense into metallic rain.</p>
+            <div class="stat-grid">
+                <div class="stat-box">
+                    <div class="label">Melting Point (Lead)</div>
+                    <div class="value">327.5 °C</div>
+                </div>
+                <div class="stat-box">
+                    <div class="label">Atmospheric Temp</div>
+                    <div class="value">1,300° - 2,400°C</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>Survival Physics & Equipment</h2>
+            <p>Walking here requires defying both thermal radiation and chemical destruction. Lead density is 11.34 g/cm³—heavy enough that rain falls like liquid shrapnel in high winds, and pools of liquid metal form rivers on the basalt crust.</p>
+            <div class="stat-grid">
+                <div class="stat-box">
+                    <div class="label">Lead Density</div>
+                    <div class="value">11.34 g/cm³</div>
+                </div>
+                <div class="stat-box">
+                    <div class="label">Required Suit</div>
+                    <div class="value">Active Cryo-Carbon</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="timeline">
+        <h2>60-Second Short Storyboard</h2>
+
+        <div class="scene-card">
+            <div class="scene-time">0:00 - 0:10</div>
+            <div class="scene-content">
+                <h3>The Hook: The Heavy Sky</h3>
+                <p>A lone astronaut stands on a cracked, obsidian-black volcanic crust. Above, a violent violet-orange super-storm churns metallic clouds.</p>
+                <div class="visual-cue">Visual: Macro shot of a metallic droplet striking a titanium boot with a heavy metallic 'clonk'.</div>
+            </div>
+        </div>
+
+        <div class="scene-card">
+            <div class="scene-time">0:10 - 0:25</div>
+            <div class="scene-content">
+                <h3>The Physics: Vaporization & Condensation</h3>
+                <p>Explanation of the day-night thermal cycle. On the dayside, lead is vaporized into gas; winds exceeding 18,000 km/h carry it across the terminator line where it condenses.</p>
+                <div class="visual-cue">Visual: Animated holographic map showing planetary wind currents dragging glowing metal vapor.</div>
+            </div>
+        </div>
+
+        <div class="scene-card">
+            <div class="scene-time">0:25 - 0:45</div>
+            <div class="scene-content">
+                <h3>The Hazard: Metallic Storms</h3>
+                <p>The drizzle thickens into a torrential downpour of molten lead drops. The visor begins to streak with glowing silver-grey runs as heat radiates through the suit.</p>
+                <div class="visual-cue">Visual: POV shot looking up through a glowing visor as heavy droplets splatter against the glass.</div>
+            </div>
+        </div>
+
+        <div class="scene-card">
+            <div class="scene-time">0:45 - 1:00</div>
+            <div class="scene-content">
+                <h3>The Climax: Rivers of Quicksilver</h3>
+                <p>Streams of glowing molten lead carve glowing orange trenches across the dark basalt landscape. The astronaut retreats into a reinforced thermal shelter.</p>
+                <div class="visual-cue">Visual: Wide cinematic drone shot of silver-red rivers snaking across an alien horizon under a dying red star.</div>
+            </div>
+        </div>
+    </div>
+
+    <footer>
+        <p>Autotube Production Research &bull; Designed for 9:16 Vertical & 16:9 Horizontal Shorts</p>
+    </body>
+</html>

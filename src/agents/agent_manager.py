@@ -167,6 +167,8 @@ def run_daily_brain(channel_id: str) -> dict:
               f"ranking without it.")
     editorial = select_winners(science_pass, config, count=9,
                                 performance_summary=performance_summary)
+    if isinstance(editorial, list):
+        editorial = {"winners": editorial, "winner": editorial[0].get("topic") if editorial and isinstance(editorial[0], dict) else str(editorial[0]) if editorial else "", "strategy_note": ""}
     winners = editorial.get("winners", []) if isinstance(editorial, dict) else []
     winner = editorial.get("winner") if isinstance(editorial, dict) else None
 

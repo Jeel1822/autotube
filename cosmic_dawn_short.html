@@ -1,0 +1,912 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="claude:viewport-fit-sides" content="cover">
+<title>Cosmic Dawn: Light from an Ancient Galaxy</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Space+Mono:wght@400;700&display=swap">
+<style>
+/*
+  Design Plan: Cosmic Dawn
+  - Palette: Deep Space Void (#07090F), Starlight Cyan (#38BDF8), Nebula Violet (#C084FC), Solar Gold (#FDE047), Surface Glass (#111827)
+  - Type: Plus Jakarta Sans for UI/Body, Space Mono for astronomical telemetry and scientific readouts
+  - Layout: Immersive scrolly-interactive dashboard designed for a 60-second vertical video script breakdown
+*/
+
+:root {
+  --bg: #07090F;
+  --bg-card: rgba(17, 24, 39, 0.75);
+  --bg-card-hover: rgba(30, 41, 59, 0.85);
+  --border: rgba(56, 189, 248, 0.15);
+  --border-hover: rgba(56, 189, 248, 0.4);
+  --fg: #F8FAFC;
+  --fg-muted: #94A3B8;
+  --accent: #38BDF8;
+  --accent-glow: rgba(56, 189, 248, 0.25);
+  --nebula: #C084FC;
+  --gold: #FDE047;
+  --success: #34D399;
+  --code-bg: #0B0F17;
+  color-scheme: dark;
+}
+
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) {
+    --bg: #F8FAFC;
+    --bg-card: rgba(255, 255, 255, 0.85);
+    --bg-card-hover: rgba(241, 245, 249, 0.95);
+    --border: rgba(14, 165, 233, 0.2);
+    --border-hover: rgba(14, 165, 233, 0.5);
+    --fg: #0F172A;
+    --fg-muted: #64748B;
+    --accent: #0284C7;
+    --accent-glow: rgba(2, 132, 199, 0.2);
+    --nebula: #9333EA;
+    --gold: #CA8A04;
+    --success: #059669;
+    --code-bg: #F1F5F9;
+    color-scheme: light;
+  }
+}
+
+:root[data-theme="light"] {
+  --bg: #F8FAFC;
+  --bg-card: rgba(255, 255, 255, 0.85);
+  --bg-card-hover: rgba(241, 245, 249, 0.95);
+  --border: rgba(14, 165, 233, 0.2);
+  --border-hover: rgba(14, 165, 233, 0.5);
+  --fg: #0F172A;
+  --fg-muted: #64748B;
+  --accent: #0284C7;
+  --accent-glow: rgba(2, 132, 199, 0.2);
+  --nebula: #9333EA;
+  --gold: #CA8A04;
+  --success: #059669;
+  --code-bg: #F1F5F9;
+  color-scheme: light;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background: var(--bg);
+  color: var(--fg);
+  font-family: 'Plus Jakarta Sans', -apple-system, sans-serif;
+  min-height: 100vh;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  overflow-x: hidden;
+  line-height: 1.6;
+}
+
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0 0 auto;
+  height: env(safe-area-inset-top, 0px);
+  z-index: 100;
+  background: var(--bg);
+}
+
+.mono {
+  font-family: 'Space Mono', monospace;
+}
+
+/* Header & Navigation */
+header {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 2.5rem 1rem 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+@media(min-width: 768px) {
+  header {
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: flex-end;
+  }
+}
+
+.brand-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-family: 'Space Mono', monospace;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+  color: var(--accent);
+  background: var(--accent-glow);
+  padding: 0.35rem 0.85rem;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  width: fit-content;
+}
+
+.brand-badge span {
+  width: 6px;
+  height: 6px;
+  background: var(--accent);
+  border-radius: 50%;
+  box-shadow: 0 0 8px var(--accent);
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.5); opacity: 0.5; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+h1 {
+  font-size: clamp(2rem, 4vw, 3.25rem);
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  line-height: 1.15;
+  text-wrap: balance;
+}
+
+h1 span {
+  background: linear-gradient(135deg, var(--accent) 0%, var(--nebula) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.subtitle {
+  color: var(--fg-muted);
+  font-size: 1.05rem;
+  max-width: 600px;
+}
+
+/* Main Container */
+main {
+  max-width: 1200px;
+  margin: 0 auto 4rem;
+  padding: 0 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 2.5rem;
+}
+
+/* Grid Layouts */
+.dashboard-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1.5rem;
+}
+
+@media(min-width: 900px) {
+  .dashboard-grid {
+    grid-template-columns: 1.2fr 1fr;
+  }
+}
+
+/* Cards */
+.card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 1rem;
+  padding: 1.75rem;
+  backdrop-filter: blur(12px);
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: 0 10px 30px -10px rgba(0,0,0,0.3);
+}
+
+.card:hover {
+  border-color: var(--border-hover);
+  box-shadow: 0 20px 40px -15px var(--accent-glow);
+}
+
+.card-title {
+  font-size: 1.15rem;
+  font-weight: 700;
+  margin-bottom: 1.25rem;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.card-title svg {
+  color: var(--accent);
+  width: 20px;
+  height: 20px;
+}
+
+/* Video Player Simulator */
+.player-container {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 9/16;
+  max-height: 600px;
+  margin: 0 auto;
+  background: #000;
+  border-radius: 0.75rem;
+  overflow: hidden;
+  border: 2px solid var(--border);
+  box-shadow: 0 25px 50px -12px rgba(0,0,0,0.7);
+  display: flex;
+  flex-direction: column;
+}
+
+@media(min-width: 900px) {
+  .player-container {
+    max-height: 540px;
+  }
+}
+
+.player-canvas-wrap {
+  position: relative;
+  flex: 1;
+  width: 100%;
+  background: radial-gradient(circle at center, #1e1b4b 0%, #030712 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  cursor: pointer;
+}
+
+canvas#galaxyCanvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.player-overlay-content {
+  position: relative;
+  z-index: 2;
+  text-align: center;
+  padding: 1.5rem;
+  pointer-events: none;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.video-header-hud {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-family: 'Space Mono', monospace;
+  font-size: 0.7rem;
+  color: var(--accent);
+  background: rgba(7, 9, 15, 0.6);
+  padding: 0.4rem 0.75rem;
+  border-radius: 99px;
+  backdrop-filter: blur(4px);
+  border: 1px solid var(--border);
+}
+
+.caption-box {
+  background: rgba(7, 9, 15, 0.85);
+  border: 1px solid var(--border);
+  padding: 1rem 1.25rem;
+  border-radius: 0.75rem;
+  backdrop-filter: blur(8px);
+  margin-bottom: 0.5rem;
+  box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+  animation: fadeIn 0.3s ease-out;
+}
+
+.caption-timestamp {
+  font-family: 'Space Mono', monospace;
+  font-size: 0.7rem;
+  color: var(--gold);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  margin-bottom: 0.25rem;
+  display: block;
+}
+
+.caption-text {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #fff;
+  line-height: 1.35;
+  text-shadow: 0 2px 4px rgba(0,0,0,0.8);
+}
+
+.player-controls-bar {
+  background: var(--code-bg);
+  padding: 1rem;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  border-top: 1px solid var(--border);
+}
+
+.btn-icon {
+  background: var(--accent);
+  color: #000;
+  border: none;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: transform 0.2s, background 0.2s;
+  flex-shrink: 0;
+  box-shadow: 0 0 15px var(--accent-glow);
+}
+
+.btn-icon:hover {
+  transform: scale(1.08);
+  background: #fff;
+}
+
+.timeline-scrubber {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.scrubber-track {
+  position: relative;
+  height: 6px;
+  background: rgba(255,255,255,0.1);
+  border-radius: 3px;
+  cursor: pointer;
+}
+
+.scrubber-fill {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  background: linear-gradient(90deg, var(--accent), var(--nebula));
+  border-radius: 3px;
+  width: 0%;
+  transition: width 0.1s linear;
+}
+
+.scrubber-time {
+  display: flex;
+  justify-content: space-between;
+  font-family: 'Space Mono', monospace;
+  font-size: 0.75rem;
+  color: var(--fg-muted);
+}
+
+/* Script Breakdown Timeline */
+.script-timeline {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  max-height: 540px;
+  overflow-y: auto;
+  padding-right: 0.5rem;
+}
+
+.script-timeline::-webkit-scrollbar {
+  width: 4px;
+}
+
+.script-timeline::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 2px;
+}
+
+.script-item {
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid var(--border);
+  border-radius: 0.75rem;
+  padding: 1rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  position: relative;
+}
+
+.script-item:hover {
+  background: var(--bg-card-hover);
+  border-color: var(--accent);
+}
+
+.script-item.active {
+  background: var(--accent-glow);
+  border-color: var(--accent);
+  box-shadow: 0 0 20px var(--accent-glow);
+}
+
+.script-item-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.5rem;
+}
+
+.script-time-badge {
+  font-family: 'Space Mono', monospace;
+  font-size: 0.75rem;
+  background: var(--code-bg);
+  color: var(--gold);
+  padding: 0.2rem 0.5rem;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+}
+
+.script-visual-cue {
+  font-size: 0.75rem;
+  color: var(--nebula);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.script-voiceover {
+  font-size: 0.95rem;
+  color: var(--fg);
+  line-height: 1.4;
+}
+
+/* Stats & Production Details Grid */
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 1.25rem;
+}
+
+.stat-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 0.85rem;
+  padding: 1.25rem 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.stat-label {
+  font-size: 0.8rem;
+  color: var(--fg-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-family: 'Space Mono', monospace;
+}
+
+.stat-value {
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: var(--accent);
+  font-family: 'Space Mono', monospace;
+}
+
+.stat-desc {
+  font-size: 0.85rem;
+  color: var(--fg-muted);
+}
+
+/* Scientific Deep Dive Box */
+.science-box {
+  background: linear-gradient(135deg, rgba(56, 189, 248, 0.05) 0%, rgba(192, 132, 252, 0.05) 100%);
+  border: 1px solid var(--border);
+  border-radius: 1rem;
+  padding: 2rem;
+}
+
+.science-content {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 2rem;
+}
+
+@media(min-width: 768px) {
+  .science-content {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.science-block h3 {
+  font-size: 1.25rem;
+  margin-bottom: 0.75rem;
+  color: var(--fg);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.science-block p {
+  color: var(--fg-muted);
+  font-size: 0.95rem;
+  margin-bottom: 1rem;
+}
+
+.badge-tag {
+  display: inline-block;
+  font-family: 'Space Mono', monospace;
+  font-size: 0.75rem;
+  background: var(--code-bg);
+  color: var(--success);
+  padding: 0.25rem 0.6rem;
+  border-radius: 4px;
+  border: 1px solid rgba(52, 211, 153, 0.2);
+}
+
+/* Copy prompt button */
+.export-section {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 0.85rem;
+  padding: 1.5rem;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.btn-primary {
+  background: linear-gradient(135deg, var(--accent) 0%, #0284C7 100%);
+  color: #07090F;
+  font-weight: 700;
+  border: none;
+  padding: 0.75rem 1.5rem;
+  border-radius: 0.5rem;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  box-shadow: 0 4px 12px var(--accent-glow);
+}
+
+.btn-primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px var(--accent-glow);
+  opacity: 0.95;
+}
+
+/* Footer */
+footer {
+  text-align: center;
+  padding: 3rem 1rem;
+  color: var(--fg-muted);
+  font-size: 0.85rem;
+  border-top: 1px solid var(--border);
+  max-width: 1200px;
+  margin: 0 auto;
+}
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <div class="brand-badge"><span></span>Shorts Production Blueprint</div>
+    <h1>Cosmic Dawn: <span>Light from an Ancient Galaxy</span></h1>
+    <p class="subtitle">A 60-second vertical video production package revealing how James Webb Space Telescope data decodes the first moments of time.</p>
+  </div>
+  <div style="display: flex; gap: 0.75rem;">
+    <button class="btn-primary" onclick="copyScript()">
+      <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-2M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"/></svg>
+      Copy Full Script
+    </button>
+  </div>
+</header>
+
+<main>
+  <!-- Video Preview & Script Breakdown Grid -->
+  <div class="dashboard-grid">
+
+    <!-- Video Player Simulation -->
+    <div class="card" style="display: flex; flex-direction: column;">
+      <div class="card-title">
+        <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/><path d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+        Interactive 9:16 Short Preview
+      </div>
+
+      <div class="player-container">
+        <div class="player-canvas-wrap" onclick="togglePlay()">
+          <canvas id="galaxyCanvas"></canvas>
+          <div class="player-overlay-content">
+            <div class="video-header-hud">
+              <span id="hudTime">00:00 / 00:60</span>
+              <span style="color: var(--gold);">JWST REDSHIFT z > 13</span>
+            </div>
+            <div class="caption-box">
+              <span class="caption-timestamp" id="capTimestamp">0:00 - Hook</span>
+              <div class="caption-text" id="capText">Tap Play to preview the 60-second video flow with animated cosmic visuals.</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="player-controls-bar">
+          <button class="btn-icon" id="playPauseBtn" onclick="togglePlay()">
+            <svg id="playIcon" width="20" height="20" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+          </button>
+          <div class="timeline-scrubber" onclick="scrubTimeline(event)">
+            <div class="scrubber-track">
+              <div class="scrubber-fill" id="scrubberFill"></div>
+            </div>
+            <div class="scrubber-time">
+              <span id="currentTimeDisplay">0s</span>
+              <span>60s</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Script Breakdown Timeline -->
+    <div class="card">
+      <div class="card-title">
+        <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 100-6 3 3 0 000 6z"/></svg>
+        Second-by-Second Script & Visual Cues
+      </div>
+
+      <div class="script-timeline" id="scriptTimeline">
+        <!-- Script items will be populated by JS -->
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Key Metrics Grid -->
+  <div class="stats-grid">
+    <div class="stat-card">
+      <span class="stat-label">Cosmic Timeline</span>
+      <span class="stat-value">300M yrs</span>
+      <span class="stat-desc">After the Big Bang (Redshift z~13)</span>
+    </div>
+    <div class="stat-card">
+      <span class="stat-label">Instrument Used</span>
+      <span class="stat-value">JWST NIRCam</span>
+      <span class="stat-desc">Infrared spectroscopy decoding light</span>
+    </div>
+    <div class="stat-card">
+      <span class="stat-label">Target Engagement</span>
+      <span class="stat-value">High Retention</span>
+      <span class="stat-desc">Fast hook + visual scale transition</span>
+    </div>
+    <div class="stat-card">
+      <span class="stat-label">Audio Vibe</span>
+      <span class="stat-value">Ethereal Drone</span>
+      <span class="stat-desc">Low bass sweep transitioning to chime</span>
+    </div>
+  </div>
+
+  <!-- Scientific Context -->
+  <div class="science-box">
+    <div class="science-content">
+      <div class="science-block">
+        <h3>
+          <svg width="20" height="20" fill="none" stroke="var(--accent)" stroke-width="2" viewBox="0 0 24 24"><path d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
+          Why Ancient Light Reveals Time
+        </h3>
+        <p>As light travels billions of years across an expanding universe, space itself stretches the light waves toward the red end of the spectrum (Redshift). By capturing infrared photons from galaxies formed just 300 million years after the Big Bang, JWST acts as a cosmic time machine.</p>
+        <span class="badge-tag">Verified Astrophysics</span>
+      </div>
+
+      <div class="science-block">
+        <h3>
+          <svg width="20" height="20" fill="none" stroke="var(--nebula)" stroke-width="2" viewBox="0 0 24 24"><path d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+          Short Production Hook Strategy
+        </h3>
+        <p>The first 3 seconds start with a jarring question about looking into the past, followed by an immediate zoom through a starfield into spectral data graphs. This dual visual pacing stops the scroll and rewards viewers with deep astrophysical wonder.</p>
+        <span class="badge-tag">Optimized for Algorithmic Reach</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Export Section -->
+  <div class="export-section">
+    <div>
+      <h3 style="font-size: 1.1rem; font-weight: 700; margin-bottom: 0.25rem;">Ready to produce your Short?</h3>
+      <p style="color: var(--fg-muted); font-size: 0.9rem;">Copy the complete voiceover script and editing cue sheet for Premiere, CapCut, or DaVinci Resolve.</p>
+    </div>
+    <button class="btn-primary" onclick="copyScript()">
+      <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-2M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"/></svg>
+      Copy Script Markdown
+    </button>
+  </div>
+
+</main>
+
+<footer>
+  Cosmic Dawn Production Blueprint &bull; Built for Creator & Scientific Storytelling
+</footer>
+
+<script>
+// Script Data Structure for 60-Second Short
+const scriptData = [
+  {
+    start: 0,
+    end: 5,
+    timestamp: "0:00 - 0:05 | Hook",
+    visual: "Extreme zoom into a dark patch of space; sudden flash of starlight.",
+    text: "When you look at this galaxy, you aren’t just looking across space... you’re looking back in time."
+  },
+  {
+    start: 5,
+    end: 15,
+    timestamp: "0:05 - 0:15 | The Mystery",
+    visual: "JWST golden mirror graphic panning to faint red smudge of GN-z11.",
+    text: "Just 300 million years after the Big Bang, light began a journey that only now, thanks to JWST, reaches our telescopes."
+  },
+  {
+    start: 15,
+    end: 30,
+    timestamp: "0:15 - 0:30 | The Physics",
+    visual: "Animation of light waves stretching into infrared (Redshift z>13 spectrum).",
+    text: "As the universe expanded, space itself stretched that ancient starlight, shifting invisible ultraviolet rays right into infrared wavelengths."
+  },
+  {
+    start: 30,
+    end: 45,
+    timestamp: "0:30 - 0:45 | The Revelation",
+    visual: "Splitscreen comparing pristine infant star clusters with modern spiral galaxies.",
+    text: "This light reveals galaxies forming way faster than astrophysicists ever predicted, rewriting our textbook on the universe’s infancy."
+  },
+  {
+    start: 45,
+    end: 60,
+    timestamp: "0:45 - 1:00 | Outro & CTA",
+    visual: "Cinematic pull-back showing Earth as a tiny pale blue dot against the cosmic web.",
+    text: "Every photon is a telegram from the dawn of time. What other secrets are hiding in the dark? Subscribe to explore more."
+  }
+];
+
+let currentSecond = 0;
+let isPlaying = false;
+let timer = null;
+
+// Canvas Starfield Simulation
+const canvas = document.getElementById('galaxyCanvas');
+const ctx = canvas.getContext('2d');
+let stars = [];
+
+function resizeCanvas() {
+  canvas.width = canvas.parentElement.clientWidth;
+  canvas.height = canvas.parentElement.clientHeight;
+}
+
+function initStars() {
+  stars = [];
+  const count = 120;
+  for(let i = 0; i < count; i++) {
+    stars.push({
+      x: Math.random() * canvas.width,
+      y: Math.random() * canvas.height,
+      size: Math.random() * 2.2 + 0.5,
+      alpha: Math.random(),
+      speed: Math.random() * 0.05 + 0.01,
+      color: Math.random() > 0.8 ? '#38BDF8' : (Math.random() > 0.9 ? '#C084FC' : '#ffffff')
+    });
+  }
+}
+
+function drawGalaxyScene() {
+  ctx.fillStyle = '#030712';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  // Draw glowing nebula center based on playback progress
+  const progress = currentSecond / 60;
+  const centerX = canvas.width / 2;
+  const centerY = canvas.height / 2;
+
+  const gradient = ctx.createRadialGradient(centerX, centerY, 10, centerX, centerY, canvas.width * (0.5 + progress * 0.5));
+  gradient.addColorStop(0, 'rgba(192, 132, 252, 0.15)');
+  gradient.addColorStop(0.5, 'rgba(56, 189, 248, 0.08)');
+  gradient.addColorStop(1, 'transparent');
+  ctx.fillStyle = gradient;
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  // Draw stars
+  stars.forEach(star => {
+    star.alpha += star.speed;
+    if(star.alpha > 1 || star.alpha < 0.2) star.speed *= -1;
+    ctx.fillStyle = star.color;
+    ctx.globalAlpha = Math.abs(star.alpha);
+    ctx.beginPath();
+    ctx.arc(star.x, star.y, star.size + (currentSecond * 0.02), 0, Math.PI * 2);
+    ctx.fill();
+  });
+  ctx.globalAlpha = 1.0;
+
+  requestAnimationFrame(drawGalaxyScene);
+}
+
+// Render Script Timeline UI
+function renderTimeline() {
+  const container = document.getElementById('scriptTimeline');
+  container.innerHTML = '';
+
+  scriptData.forEach((item, index) => {
+    const isActive = currentSecond >= item.start && currentSecond < item.end;
+    const div = document.createElement('div');
+    div.className = `script-item ${isActive ? 'active' : ''}`;
+    div.onclick = () => jumpToSecond(item.start);
+    div.innerHTML = `
+      <div class="script-item-header">
+        <span class="script-time-badge">${item.timestamp}</span>
+        <span class="script-visual-cue">Visual: ${item.visual}</span>
+      </div>
+      <div class="script-voiceover">"${item.text}"</div>
+    `;
+    container.appendChild(div);
+  });
+}
+
+function updatePlayerUI() {
+  const activeItem = scriptData.find(item => currentSecond >= item.start && currentSecond < item.end) || scriptData[scriptData.length - 1];
+
+  document.getElementById('capTimestamp').innerText = activeItem.timestamp;
+  document.getElementById('capText').innerText = `"${activeItem.text}"`;
+  document.getElementById('hudTime').innerText = `0:${String(currentSecond).padStart(2, '0')} / 0:60`;
+  document.getElementById('currentTimeDisplay').innerText = `${currentSecond}s`;
+
+  const progressPercent = (currentSecond / 60) * 100;
+  document.getElementById('scrubberFill').style.width = `${progressPercent}%`;
+
+  renderTimeline();
+}
+
+function togglePlay() {
+  isPlaying = !isPlaying;
+  const playIcon = document.getElementById('playIcon');
+
+  if (isPlaying) {
+    playIcon.innerHTML = '<path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>';
+    if(currentSecond >= 60) currentSecond = 0;
+    timer = setInterval(() => {
+      currentSecond++;
+      if (currentSecond > 60) {
+        currentSecond = 60;
+        togglePlay();
+      }
+      updatePlayerUI();
+    }, 1000);
+  } else {
+    playIcon.innerHTML = '<path d="M8 5v14l11-7z"/>';
+    clearInterval(timer);
+  }
+}
+
+function jumpToSecond(sec) {
+  currentSecond = sec;
+  updatePlayerUI();
+}
+
+function scrubTimeline(e) {
+  const rect = e.currentTarget.getBoundingClientRect();
+  const clickX = e.clientX - rect.left;
+  const width = rect.width;
+  const percentage = Math.max(0, Math.min(1, clickX / width));
+  currentSecond = Math.floor(percentage * 60);
+  updatePlayerUI();
+}
+
+function copyScript() {
+  const fullText = scriptData.map(s => `[${s.timestamp}]\nVisual: ${s.visual}\nVoiceover: "${s.text}"\n`).join('\n');
+  navigator.clipboard.writeText(fullText).then(() => {
+    alert('Full 60-second video script copied to clipboard!');
+  }).catch(() => {
+    prompt('Copy script below:', fullText);
+  });
+}
+
+// Initialize
+window.addEventListener('resize', resizeCanvas);
+window.addEventListener('DOMContentLoaded', () => {
+  resizeCanvas();
+  initStars();
+  drawGalaxyScene();
+  renderTimeline();
+  updatePlayerUI();
+});
+</script>
+</body>
+</html>

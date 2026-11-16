@@ -1,0 +1,800 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="claude:viewport-fit-sides" content="cover">
+<title>Supernova Kill Zone: Earth's Cosmic Threat</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=Space+Mono:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
+<style>
+/*
+  Design Plan: Cosmic Doom & Scientific Rigor
+  - Palette: Deep Void (#030712), Pulsar Orange (#FF6B35), Ion Cyan (#00F0FF), Radiation Violet (#8B5CF6), Surface Dust (#9CA3AF)
+  - Type: 'Outfit' for striking editorial headers, 'Space Mono' for scientific data and timestamps
+  - Layout: Immersive scrolly-interactive timeline of annihilation and recovery, optimized for 60s narrative pacing
+*/
+
+:root {
+  --bg: #030712;
+  --bg-card: #0d1322;
+  --bg-card-hover: #131d35;
+  --fg: #F3F4F6;
+  --fg-muted: #9CA3AF;
+  --accent: #FF6B35;
+  --accent-glow: rgba(255, 107, 53, 0.3);
+  --cyan: #00F0FF;
+  --cyan-glow: rgba(0, 240, 255, 0.2);
+  --violet: #8B5CF6;
+  --border: #1F2937;
+  --border-glow: #374151;
+  --danger: #EF4444;
+  --success: #10B981;
+
+  color-scheme: dark;
+}
+
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) {
+    --bg: #F8FAFC;
+    --bg-card: #FFFFFF;
+    --bg-card-hover: #F1F5F9;
+    --fg: #0F172A;
+    --fg-muted: #64748B;
+    --accent: #EA580C;
+    --accent-glow: rgba(234, 88, 12, 0.2);
+    --cyan: #0284C7;
+    --cyan-glow: rgba(2, 132, 199, 0.15);
+    --violet: #7C3AED;
+    --border: #E2E8F0;
+    --border-glow: #CBD5E1;
+    --danger: #DC2626;
+    --success: #059669;
+
+    color-scheme: light;
+  }
+}
+
+:root[data-theme="dark"] {
+  --bg: #030712;
+  --bg-card: #0d1322;
+  --bg-card-hover: #131d35;
+  --fg: #F3F4F6;
+  --fg-muted: #9CA3AF;
+  --accent: #FF6B35;
+  --accent-glow: rgba(255, 107, 53, 0.3);
+  --cyan: #00F0FF;
+  --cyan-glow: rgba(0, 240, 255, 0.2);
+  --violet: #8B5CF6;
+  --border: #1F2937;
+  --border-glow: #374151;
+  --danger: #EF4444;
+  --success: #10B981;
+
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background: var(--bg);
+  color: var(--fg);
+  font-family: 'Outfit', sans-serif;
+  min-height: 100vh;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  overflow-x: hidden;
+  line-height: 1.6;
+}
+
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0 0 auto;
+  height: env(safe-area-inset-top, 0px);
+  z-index: 100;
+  background: var(--bg);
+}
+
+code, pre, .mono {
+  font-family: 'Space Mono', monospace;
+}
+
+/* Header & Hero */
+header {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 48px 16px 32px;
+  text-align: center;
+  position: relative;
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 16px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 100px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--accent);
+  margin-bottom: 20px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  box-shadow: 0 0 20px var(--accent-glow);
+}
+
+.badge span.dot {
+  width: 8px;
+  height: 8px;
+  background: var(--accent);
+  border-radius: 50%;
+  animation: pulse 1.5s infinite;
+}
+
+@keyframes pulse {
+  0% { transform: scale(0.95); box-shadow: 0 0 0 0 var(--accent-glow); }
+  70% { transform: scale(1); box-shadow: 0 0 0 8px rgba(255, 107, 53, 0); }
+  100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(255, 107, 53, 0); }
+}
+
+h1 {
+  font-size: clamp(2.2rem, 5vw, 3.8rem);
+  font-weight: 900;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+  margin-bottom: 16px;
+  text-wrap: balance;
+}
+
+h1 span {
+  background: linear-gradient(135deg, var(--accent), #FFB703);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.subtitle {
+  font-size: clamp(1rem, 2vw, 1.25rem);
+  color: var(--fg-muted);
+  max-width: 650px;
+  margin: 0 auto 32px;
+  text-wrap: balance;
+}
+
+/* Simulator / Video Player Bar */
+.simulator-container {
+  max-width: 900px;
+  margin: 0 auto 48px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 24px;
+  overflow: hidden;
+  box-shadow: 0 20px 40px rgba(0,0,0,0.4);
+}
+
+.simulator-screen {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  background: #000;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.canvas-bg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.screen-overlay-content {
+  position: relative;
+  z-index: 5;
+  text-align: center;
+  padding: 24px;
+  max-width: 700px;
+}
+
+.telemetry-hud {
+  position: absolute;
+  top: 16px;
+  left: 16px;
+  right: 16px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.8rem;
+  color: var(--cyan);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  z-index: 10;
+  pointer-events: none;
+}
+
+.hud-pill {
+  background: rgba(3, 7, 18, 0.8);
+  border: 1px solid var(--border);
+  padding: 4px 10px;
+  border-radius: 6px;
+  backdrop-filter: blur(4px);
+}
+
+.script-caption {
+  font-size: clamp(1.1rem, 2.2vw, 1.5rem);
+  font-weight: 600;
+  color: #fff;
+  text-shadow: 0 2px 8px rgba(0,0,0,0.8);
+  margin-bottom: 16px;
+  min-height: 3.2em;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-wrap: balance;
+}
+
+.simulator-controls {
+  padding: 20px 24px;
+  background: var(--bg-card);
+  border-top: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.timeline-scrubber {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.timeline-scrubber input[type="range"] {
+  flex: 1;
+  accent-color: var(--accent);
+  height: 6px;
+  border-radius: 3px;
+  background: var(--border);
+  cursor: pointer;
+}
+
+.time-readout {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--accent);
+  min-width: 70px;
+  text-align: right;
+}
+
+.control-buttons {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.btn-group {
+  display: flex;
+  gap: 8px;
+}
+
+button {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--fg);
+  padding: 10px 20px;
+  border-radius: 10px;
+  font-weight: 600;
+  font-size: 0.95rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+button:hover {
+  background: var(--bg-card-hover);
+  border-color: var(--fg-muted);
+  transform: translateY(-1px);
+}
+
+button.primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+button.primary:hover {
+  background: #e05620;
+}
+
+/* Scientific Vet Grid & Analysis */
+section.scientific-vet {
+  max-width: 900px;
+  margin: 0 auto 64px;
+}
+
+.section-header {
+  margin-bottom: 28px;
+}
+
+.section-header h2 {
+  font-size: 1.8rem;
+  font-weight: 800;
+  margin-bottom: 8px;
+  letter-spacing: -0.01em;
+}
+
+.section-header p {
+  color: var(--fg-muted);
+  font-size: 1rem;
+}
+
+.grid-3 {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 20px;
+}
+
+.card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 24px;
+  transition: transform 0.2s ease, border-color 0.2s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.card:hover {
+  transform: translateY(-3px);
+  border-color: var(--border-glow);
+}
+
+.card::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 3px;
+  background: var(--accent);
+}
+
+.card.cyan::before { background: var(--cyan); }
+.card.violet::before { background: var(--violet); }
+
+.card-phase {
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--fg-muted);
+  margin-bottom: 8px;
+}
+
+.card h3 {
+  font-size: 1.25rem;
+  font-weight: 700;
+  margin-bottom: 12px;
+  color: var(--fg);
+}
+
+.card p {
+  color: var(--fg-muted);
+  font-size: 0.95rem;
+  line-height: 1.5;
+}
+
+/* Video Script breakdown */
+.script-breakdown {
+  max-width: 900px;
+  margin: 0 auto 64px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 24px;
+  padding: 32px;
+}
+
+.script-timeline {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  margin-top: 24px;
+}
+
+.script-row {
+  display: grid;
+  grid-template-columns: 120px 1fr;
+  gap: 20px;
+  align-items: start;
+  padding-bottom: 24px;
+  border-bottom: 1px solid var(--border);
+}
+
+.script-row:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.timestamp {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  padding: 6px 12px;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--cyan);
+  text-align: center;
+}
+
+.script-text {
+  font-size: 1.05rem;
+  color: var(--fg);
+  font-weight: 400;
+}
+
+/* Sources & Footer */
+footer {
+  max-width: 900px;
+  margin: 0 auto 64px;
+  text-align: center;
+  padding-top: 24px;
+  border-top: 1px solid var(--border);
+  color: var(--fg-muted);
+  font-size: 0.9rem;
+}
+
+footer a {
+  color: var(--cyan);
+  text-decoration: none;
+}
+
+footer a:hover {
+  text-decoration: underline;
+}
+
+@media(max-width: 600px) {
+  .script-row {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+  .timestamp {
+    width: fit-content;
+  }
+}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="badge"><span class="dot"></span>Scientific Vet & Interactive Simulator</div>
+  <h1>What Happens When a Supernova Explodes <span>Right Next to Earth</span></h1>
+  <p class="subtitle">An astrophysical breakdown of a 30 light-year hypernova "kill zone", ozone collapse, and marine extinction.</p>
+</header>
+
+<main>
+  <!-- Interactive 60s Simulation Player -->
+  <div class="simulator-container">
+    <div class="simulator-screen">
+      <canvas id="simCanvas" class="canvas-bg"></canvas>
+      <div class="telemetry-hud">
+        <span class="hud-pill" id="hudDistance">Distance: 30 Ly</span>
+        <span class="hud-pill" id="hudStatus">Status: Nominal</span>
+      </div>
+      <div class="screen-overlay-content">
+        <div class="script-caption" id="captionText">Press Play to run the 60-second catastrophic timeline simulation.</div>
+      </div>
+    </div>
+    <div class="simulator-controls">
+      <div class="timeline-scrubber">
+        <span class="mono" id="currentTimeLabel">0.0s</span>
+        <input type="range" id="timeRange" min="0" max="60" step="0.1" value="0">
+        <span class="mono">60.0s</span>
+      </div>
+      <div class="control-buttons">
+        <div class="btn-group">
+          <button id="playBtn" class="primary">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+            Play Short
+          </button>
+          <button id="resetBtn">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path><path d="M3 3v5h5"></path></svg>
+            Reset
+          </button>
+        </div>
+        <div class="time-readout mono" id="timeReadout">00:00 / 01:00</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Scientific Vet Phases of Impact -->
+  <section class="scientific-vet">
+    <div class="section-header">
+      <h2>Phases of Cosmic Impact</h2>
+      <p>Rigorous scientific vet of the three destructive stages when a massive star detonates in Earth's kill zone.</p>
+    </div>
+    <div class="grid-3">
+      <div class="card">
+        <div class="card-phase">Time: t = 0 (Instantaneous)</div>
+        <h3>The Flash (Optical & UV)</h3>
+        <p>Blinding light brighter than a billion suns hits Earth instantly, vaporizing the upper ozone layer and exposing the surface to lethal solar and cosmic radiation.</p>
+      </div>
+      <div class="card cyan">
+        <div class="card-phase">Time: Days to Years</div>
+        <h3>The Cosmic Ray Shower</h3>
+        <p>High-energy particles arrive, destroying remaining ozone, triggering global climate cooling via nitrate aerosols, and causing mass extinction of marine and surface life.</p>
+      </div>
+      <div class="card violet">
+        <div class="card-phase">Time: Millennia Aftermath</div>
+        <h3>The Remnant</h3>
+        <p>A glowing neutron star or black hole is left behind in the stellar cradle, while Earth's biosphere takes millennia to recover its complex ecosystems.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Script Structure Breakdown -->
+  <section class="script-breakdown">
+    <div class="section-header">
+      <h2>YouTube Short / TikTok Script Structure</h2>
+      <p>Target duration: 60 seconds | Word count: 130-150 words</p>
+    </div>
+    <div class="script-timeline">
+      <div class="script-row">
+        <div class="timestamp mono">0s - 5s (Hook)</div>
+        <div class="script-text">"Imagine a star ten times the mass of our Sun going hypernova right in our cosmic backyard—just 30 light-years away."</div>
+      </div>
+      <div class="script-row">
+        <div class="timestamp mono">5s - 20s (Build)</div>
+        <div class="script-text">"At first, you’d see a flash brighter than a billion suns, rivaling the daytime sky. But the real nightmare starts seconds later."</div>
+      </div>
+      <div class="script-row">
+        <div class="timestamp mono">20s - 40s (Climax)</div>
+        <div class="script-text">"High-energy gamma rays and cosmic rays bombard Earth, instantly shredding our ozone layer. UV radiation floods the surface, sterilizing plant life and collapsing ocean food webs."</div>
+      </div>
+      <div class="script-row">
+        <div class="timestamp mono">40s - 60s (Resolution)</div>
+        <div class="script-text">"Global temperatures plummet as nitrogen oxides block the sun, triggering a mass extinction. Thankfully, our nearest ticking time bomb is safely hundreds of light-years away. Sleep tight!"</div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <p>Scientific source: <a href="https://www.nasa.gov/universe/supernovae-nearby-earth-risks/" target="_blank" rel="noopener">NASA Universe - Supernovae Nearby Earth Risks</a></p>
+</footer>
+
+<script>
+// Interactive Canvas Simulation & Timeline sync
+const canvas = document.getElementById('simCanvas');
+const ctx = canvas.getContext('2d');
+const timeRange = document.getElementById('timeRange');
+const playBtn = document.getElementById('playBtn');
+const resetBtn = document.getElementById('resetBtn');
+const captionText = document.getElementById('captionText');
+const timeReadout = document.getElementById('timeReadout');
+const currentTimeLabel = document.getElementById('currentTimeLabel');
+const hudStatus = document.getElementById('hudStatus');
+const hudDistance = document.getElementById('hudDistance');
+
+let isPlaying = false;
+let currentTime = 0;
+let animationId = null;
+let lastTimestamp = null;
+
+function resizeCanvas() {
+  const rect = canvas.getBoundingClientRect();
+  canvas.width = rect.width * window.devicePixelRatio;
+  canvas.height = rect.height * window.devicePixelRatio;
+  ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
+}
+window.addEventListener('resize', resizeCanvas);
+resizeCanvas();
+
+const scriptCues = [
+  { start: 0, end: 5, text: "Imagine a star ten times the mass of our Sun going hypernova right in our cosmic backyard—just 30 light-years away.", status: "Warning: Unstable Supergiant" },
+  { start: 5, end: 20, text: "At first, you’d see a flash brighter than a billion suns, rivaling the daytime sky. But the real nightmare starts seconds later.", status: "Phase 1: Optical & UV Flash" },
+  { start: 20, end: 40, text: "High-energy gamma rays and cosmic rays bombard Earth, instantly shredding our ozone layer. UV radiation floods the surface, sterilizing plant life and collapsing ocean food webs.", status: "Phase 2: Cosmic Ray Shower & Ozone Collapse" },
+  { start: 40, end: 60, text: "Global temperatures plummet as nitrogen oxides block the sun, triggering a mass extinction. Thankfully, our nearest ticking time bomb is safely hundreds of light-years away. Sleep tight!", status: "Phase 3: Nuclear Winter & Recovery" }
+];
+
+function getActiveCue(t) {
+  return scriptCues.find(c => t >= c.start && t <= c.end) || scriptCues[scriptCues.length - 1];
+}
+
+function drawScene(t) {
+  const width = canvas.clientWidth;
+  const height = canvas.clientHeight;
+
+  ctx.clearRect(0, 0, width, height);
+
+  // Draw starry background
+  ctx.fillStyle = '#030712';
+  ctx.fillRect(0, 0, width, height);
+
+  // Draw distant stars
+  ctx.fillStyle = 'rgba(255,255,255,0.4)';
+  for (let i = 0; i < 50; i++) {
+    let x = (Math.sin(i * 99) * 10000) % width;
+    let y = (Math.cos(i * 33) * 10000) % height;
+    if (x < 0) x += width;
+    if (y < 0) y += height;
+    ctx.fillRect(x, y, 1.5, 1.5);
+  }
+
+  const cx = width / 2;
+  const cy = height / 2;
+
+  // Draw Earth
+  const earthRadius = Math.min(width, height) * 0.15;
+
+  // Atmosphere glow based on time
+  let ozoneHealth = 1.0;
+  if (t >= 5 && t <= 20) {
+    ozoneHealth = 1.0 - ((t - 5) / 15) * 0.5;
+  } else if (t > 20 && t <= 40) {
+    ozoneHealth = 0.5 - ((t - 20) / 20) * 0.4;
+  } else if (t > 40) {
+    ozoneHealth = 0.1;
+  }
+
+  // Ozone glow ring
+  ctx.beginPath();
+  ctx.arc(cx, cy, earthRadius + 8, 0, Math.PI * 2);
+  ctx.strokeStyle = t > 20 ? `rgba(239, 68, 68, ${0.3 + ozoneHealth * 0.7})` : `rgba(0, 240, 255, ${0.3 + ozoneHealth * 0.7})`;
+  ctx.lineWidth = 4;
+  ctx.stroke();
+
+  // Earth body
+  const earthGradient = ctx.createRadialGradient(cx - earthRadius*0.3, cy - earthRadius*0.3, earthRadius*0.1, cx, cy, earthRadius);
+  earthGradient.addColorStop(0, '#3B82F6');
+  earthGradient.addColorStop(0.7, '#1E3A8A');
+  earthGradient.addColorStop(1, '#0F172A');
+
+  ctx.beginPath();
+  ctx.arc(cx, cy, earthRadius, 0, Math.PI * 2);
+  ctx.fillStyle = earthGradient;
+  ctx.fill();
+
+  // Continents approximation
+  ctx.fillStyle = 'rgba(16, 185, 129, 0.6)';
+  ctx.beginPath();
+  ctx.arc(cx - earthRadius*0.3, cy - earthRadius*0.2, earthRadius*0.35, 0.2, Math.PI);
+  ctx.arc(cx + earthRadius*0.2, cy + earthRadius*0.3, earthRadius*0.3, Math.PI, Math.PI*2);
+  ctx.fill();
+
+  // Supernova Star (top right or left)
+  const starX = width * 0.8;
+  const starY = height * 0.25;
+
+  if (t < 5) {
+    // Normal bright star
+    ctx.beginPath();
+    ctx.arc(starX, starY, 6, 0, Math.PI * 2);
+    ctx.fillStyle = '#FFB703';
+    ctx.shadowColor = '#FFB703';
+    ctx.shadowBlur = 15;
+    ctx.fill();
+    ctx.shadowBlur = 0;
+  } else if (t >= 5 && t < 20) {
+    // The Flash (Blinding expansion)
+    let flashProgress = (t - 5) / 15;
+    let radius = 10 + flashProgress * 120;
+
+    let grad = ctx.createRadialGradient(starX, starY, 0, starX, starY, radius);
+    grad.addColorStop(0, 'rgba(255, 255, 255, 1)');
+    grad.addColorStop(0.3, 'rgba(255, 183, 3, 0.9)');
+    grad.addColorStop(1, 'rgba(255, 107, 53, 0)');
+
+    ctx.beginPath();
+    ctx.arc(starX, starY, radius, 0, Math.PI * 2);
+    ctx.fillStyle = grad;
+    ctx.fill();
+
+    // Light rays hitting Earth
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(starX, starY);
+    ctx.lineTo(cx, cy);
+    ctx.stroke();
+  } else if (t >= 20 && t <= 40) {
+    // Cosmic Ray Shower (Particle waves)
+    let waveProgress = (t - 20) / 20;
+
+    ctx.strokeStyle = 'rgba(0, 240, 255, 0.6)';
+    ctx.lineWidth = 3;
+    for (let i = 0; i < 4; i++) {
+      let r = waveProgress * width * 0.8 + i * 30;
+      ctx.beginPath();
+      ctx.arc(starX, starY, r, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+  } else {
+    // Remnant (Neutron star / pulsar glow)
+    ctx.beginPath();
+    ctx.arc(starX, starY, 8, 0, Math.PI * 2);
+    ctx.fillStyle = '#00F0FF';
+    ctx.shadowColor = '#00F0FF';
+    ctx.shadowBlur = 20;
+    ctx.fill();
+    ctx.shadowBlur = 0;
+  }
+}
+
+function updateSimulation() {
+  const cue = getActiveCue(currentTime);
+  captionText.textContent = cue.text;
+  hudStatus.textContent = cue.status;
+
+  const minutes = Math.floor(currentTime / 60);
+  const seconds = (currentTime % 60).toFixed(1);
+  timeReadout.textContent = `${String(minutes).padStart(2, '0')}:${String(Math.floor(seconds)).padStart(2, '0')} / 01:00`;
+  currentTimeLabel.textContent = currentTime.toFixed(1) + 's';
+  timeRange.value = currentTime;
+
+  drawScene(currentTime);
+}
+
+function loop(timestamp) {
+  if (!lastTimestamp) lastTimestamp = timestamp;
+  const elapsed = (timestamp - lastTimestamp) / 1000;
+  lastTimestamp = timestamp;
+
+  if (isPlaying) {
+    currentTime += elapsed * 1.2; // 60s video in 50 seconds real time for good pacing
+    if (currentTime >= 60) {
+      currentTime = 60;
+      isPlaying = false;
+      playBtn.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg> Play Short`;
+    }
+    updateSimulation();
+    animationId = requestAnimationFrame(loop);
+  }
+}
+
+playBtn.addEventListener('click', () => {
+  isPlaying = !isPlaying;
+  if (isPlaying) {
+    if (currentTime >= 60) currentTime = 0;
+    playBtn.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect></svg> Pause`;
+    lastTimestamp = null;
+    animationId = requestAnimationFrame(loop);
+  } else {
+    playBtn.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg> Play Short`;
+    cancelAnimationFrame(animationId);
+  }
+});
+
+resetBtn.addEventListener('click', () => {
+  isPlaying = false;
+  playBtn.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg> Play Short`;
+  cancelAnimationFrame(animationId);
+  currentTime = 0;
+  updateSimulation();
+});
+
+timeRange.addEventListener('input', (e) => {
+  isPlaying = false;
+  playBtn.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg> Play Short`;
+  cancelAnimationFrame(animationId);
+  currentTime = parseFloat(e.target.value);
+  updateSimulation();
+});
+
+// Initial render
+updateSimulation();
+</script>
+
+</body>
+</html>
