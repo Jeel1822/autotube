@@ -13,13 +13,25 @@ from google.genai import types
 GEMINI_MODEL = "gemini-flash-lite-latest"
 
 
+# Per-request HTTP timeout. WITHOUT this the SDK waits forever on a stalled
+# connection: the 2026-11-24 Actions run hung 44 min on one Gemini call and was
+# cancelled by the job timeout. A timeout makes the call raise, which the retry
+# / model-fallback logic below already handles.
+REQUEST_TIMEOUT_S = int(os.environ.get("GEMINI_TIMEOUT_S", "90"))
+
+
+def gemini_http_options():
+    """HttpOptions with a hard per-request timeout (SDK expects milliseconds)."""
+    return types.HttpOptions(timeout=REQUEST_TIMEOUT_S * 1000)
+
+
 def get_client():
     api_key = os.environ.get("GEMINI_API_KEY")
 
     if not api_key:
         raise RuntimeError("GEMINI_API_KEY is not set")
 
-    return genai.Client(api_key=api_key)
+    return genai.Client(api_key=api_key, http_options=gemini_http_options())
 
 
 # Fallback models tried if the primary stays overloaded (comma-separated env override).

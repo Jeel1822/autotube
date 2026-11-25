@@ -42,7 +42,8 @@ import time
 
 from google import genai as genai_client
 
-from src.gemini_client import send_with_retry, _is_transient, _DOWN_UNTIL
+from src.gemini_client import (send_with_retry, _is_transient, _DOWN_UNTIL,
+                               gemini_http_options)
 
 
 # Keep this synchronized with the rest of the project.
@@ -112,7 +113,7 @@ def _client():
     if not key:
         raise RuntimeError("GEMINI_API_KEY is missing.")
 
-    return genai_client.Client(api_key=key)
+    return genai_client.Client(http_options=gemini_http_options(), api_key=key)
 
 
 def _chat(client):
@@ -357,6 +358,12 @@ def check_script(
     basic_problems = _basic_script_checks(
         script, target_words
     )
+
+    # Data-driven retention checks (Shorts only; see src/retention_gate.py).
+    if config.get("use_retention_gate") and target_words <= 200:
+        from src.retention_gate import retention_problems
+        basic_problems = list(basic_problems) + retention_problems(
+            script, int(config.get("short_length_seconds", 45)))
 
     client = _client()
     chat = _chat(client)

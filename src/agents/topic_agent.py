@@ -25,9 +25,14 @@ def find_topics(
     from src.agents.memory import load_memory
     memory = load_memory(channel_id)
     evolution_block = ""
-    if memory.get("evolution_directives"):
-        directive_data = memory.get("evolution_directives", {})
-        evolution_block = f"\nACTIVE SYSTEM EVOLUTION DIRECTIVE:\n{directive_data.get('directive', '')}\n"
+    directives = memory.get("evolution_directives")
+    if directives:
+        # Stored as a list (newest last); older code stored a dict. The old
+        # code called .get() on the list and crashed whenever a directive existed.
+        latest = directives[-1] if isinstance(directives, list) else directives
+        text = latest.get("directive", "") if isinstance(latest, dict) else str(latest)
+        if text:
+            evolution_block = f"\nACTIVE SYSTEM EVOLUTION DIRECTIVE:\n{text}\n"
 
     result = run_json_batch(
         "Topic Hunter",
@@ -37,7 +42,7 @@ Generate exactly {count} candidate topics.
 
 Each item must contain:
 {{
-  "topic": "first-person scene title, 4-8 words, NEVER starting with 'How', 'Why', 'What', or 'Can'",
+  "topic": "plain concrete claim or first-person scene, 4-7 words, not starting with 'How'",
   "curiosity": 1,
   "novelty": 1,
   "visual": 1,
@@ -52,13 +57,17 @@ Return JSON object:
 {evolution_block}
 Audience: adults 35+, watching on phones.
 
-CRITICAL REQUIREMENT - SPATIAL PARADOX FORMULA:
-Every candidate topic MUST follow our 1,000+ view blueprint:
-1. FIRST-PERSON LOCATION: Must place the viewer's body in an impossible physical location ("Walking on...", "Standing on...", "Floating inside...").
-2. EVERYDAY OBJECT ANCHOR: Must contrast cosmic scale with a hyper-familiar object (a strawberry, coffee, a ring, glass, a compass).
-3. SENSORY CONSONANCE: Must imply a direct physical sensation (weight, sound, smell, dropping).
-- NEVER start a topic with "How", "Why", "What", or "Can".
-- Keep titles to 4-8 words.
+WINNING BLUEPRINT (every Short above ~1,000 views so far fits this):
+1. FAMILIAR OBJECT x ALIEN PLACE: a thing the viewer can picture instantly
+   (pencil, steel coin, wood, ice, moon dust, a rocket) in a place where it behaves
+   strangely (Venus, Pluto, liquid nitrogen, molten sulfur).
+2. ONE plain, concrete claim stated in the topic itself ("Moon dust smells like a
+   gunshot", "Why pencils float on Venus"). Both plain claims and first-person
+   scenes ("Walking on...", "Standing on...") have worked; use roughly half each.
+3. A physical sensation: weight, smell, sound, floating, igniting.
+- Avoid titles that open with "How" (mechanism titles did worst). "Why"/"What" are
+  fine only when followed by a concrete claim about a familiar object.
+- Keep titles to 4-7 words.
 
 ALREADY USED CHANNEL TOPICS:
 {used}

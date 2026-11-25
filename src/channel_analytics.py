@@ -25,41 +25,45 @@ LOOKBACK_DAYS = 90
 
 
 def fetch_video_performance(youtube_analytics, video_ids: list) -> dict:
-    """Returns {video_id: {"views": int, "avg_view_pct": float,
-    "subscribers_gained": int}} for the given video IDs. Empty dict on
-    any failure or if video_ids is empty."""
+    """Returns {video_id: {"views", "avg_view_pct", "avg_view_s",
+    "subscribers_gained"}} for the given video IDs. Empty dict on any failure
+    or if video_ids is empty. Queried in chunks (the API caps the number of
+    ids per filter and rows per page)."""
     if not video_ids:
         return {}
-    try:
-        end = datetime.now(timezone.utc).date()
-        start = end - timedelta(days=LOOKBACK_DAYS)
-        response = youtube_analytics.reports().query(
-            ids="channel==MINE",
-            startDate=start.strftime("%Y-%m-%d"),
-            endDate=end.strftime("%Y-%m-%d"),
-            metrics="views,averageViewPercentage,subscribersGained",
-            dimensions="video",
-            filters=f"video=={','.join(video_ids)}",
-            maxResults=200,
-        ).execute()
-
-        rows = response.get("rows", [])
+    result = {}
+    end = datetime.now(timezone.utc).date()
+    start = end - timedelta(days=LOOKBACK_DAYS)
+    for i in range(0, len(video_ids), 100):
+        chunk = video_ids[i:i + 100]
+        try:
+            response = youtube_analytics.reports().query(
+                ids="channel==MINE",
+                startDate=start.strftime("%Y-%m-%d"),
+                endDate=end.strftime("%Y-%m-%d"),
+                metrics=("views,averageViewPercentage,averageViewDuration,"
+                         "subscribersGained"),
+                dimensions="video",
+                filters=f"video=={','.join(chunk)}",
+                sort="-views",
+                maxResults=200,
+            ).execute()
+        except Exception as e:
+            print(f"WARNING: fetching video performance failed ({e}); "
+                  f"no analytics context available for this chunk.")
+            continue
         headers = [h["name"] for h in response.get("columnHeaders", [])]
-        result = {}
-        for row in rows:
+        for row in response.get("rows", []):
             entry = dict(zip(headers, row))
             vid = entry.get("video")
             if vid:
                 result[vid] = {
                     "views": entry.get("views", 0),
                     "avg_view_pct": entry.get("averageViewPercentage", 0),
+                    "avg_view_s": entry.get("averageViewDuration", 0),
                     "subscribers_gained": entry.get("subscribersGained", 0),
                 }
-        return result
-    except Exception as e:
-        print(f"WARNING: fetching video performance failed ({e}); "
-              f"no analytics context available this run.")
-        return {}
+    return result
 
 
 def _fmt_stats(stats: dict) -> str:

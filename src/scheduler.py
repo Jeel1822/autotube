@@ -37,6 +37,7 @@ import yaml
 
 ROOT = Path(__file__).resolve().parent.parent
 STATE_DIR = ROOT / "state"
+JOB_TIMEOUT_S = int(os.environ.get("JOB_TIMEOUT_S", str(25 * 60)))
 
 
 def _time_to_minutes(time_str: str) -> int:
@@ -187,9 +188,19 @@ def main():
                 if is_short:
                     cmd.append("--short")
 
-                result = subprocess.run(cmd)
-                if result.returncode != 0:
-                    print(f"WARNING: {channel_id} {label} run failed (exit {result.returncode}); "
+                # Hard wall-clock cap so one hung call can't burn the whole
+                # Actions job (a 2026-11-24 run hung 44 min and was cancelled,
+                # which also skipped the slot). On timeout the slot is NOT
+                # marked done, so it retries on the next hourly tick.
+                try:
+                    result = subprocess.run(cmd, timeout=JOB_TIMEOUT_S)
+                    returncode = result.returncode
+                except subprocess.TimeoutExpired:
+                    print(f"WARNING: {channel_id} {label} exceeded "
+                          f"{JOB_TIMEOUT_S // 60} min; killed.", file=sys.stderr)
+                    returncode = 124
+                if returncode != 0:
+                    print(f"WARNING: {channel_id} {label} run failed (exit {returncode}); "
                           f"NOT marking slot done, so it will retry next tick instead of being lost.",
                           file=sys.stderr)
                     # Break here so we don't proceed to mark the slot done if one language fails

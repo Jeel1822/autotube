@@ -23,6 +23,7 @@ import os
 import shutil
 from pathlib import Path
 
+from src.gemini_client import gemini_http_options
 try:
     from google import genai as genai_client
     GEMINI_AVAILABLE = True
@@ -480,7 +481,7 @@ def generate_mascot_assets(
 
         try:
 
-            client = genai_client.Client(
+            client = genai_client.Client(http_options=gemini_http_options(), 
                 api_key=os.environ[
                     "GEMINI_API_KEY"
                 ]

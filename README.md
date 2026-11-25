@@ -1,4 +1,10 @@
-# AutoTube — 3-channel autonomous YouTube pipeline
+# AutoTube — autonomous YouTube pipeline
+
+> **Current state (Nov 2026):** only `cosmic_curious` is enabled in CI
+> (`ENABLED_CHANNELS` in the workflow), 3 Shorts/day, long-form paused. The 3-channel
+> text below is the original design. See `CHANGELOG_EXPERIMENTS.md` for what is being
+> tested, and the "Operations" section at the end for the CI secrets that must be set.
+
 
 Generates and uploads 1 long-form video + 5 Shorts per day, per channel,
 across 3 channels, fully free, running on GitHub Actions (no server needed).
@@ -172,3 +178,25 @@ channel growth you'll likely want to:
 - For **Money Simple** specifically: YouTube scrutinizes finance content
   (YMYL policy) more heavily — keep scripts educational, never
   prescriptive ("you should buy X")
+
+
+## Operations (added Nov 2026)
+
+**Required GitHub secrets for the learning loop to run in CI**
+- `YOUTUBE_DATA_API_KEY` -- was EMPTY in the Nov 24 run, so channel sync, Trend Scout and
+  the Hashtag agent were silently skipped. The workflow now prints a warning if it is unset.
+- `YOUTUBE_ANALYTICS_TOKEN_COSMIC_CURIOUS` (optional) -- base64 of
+  `tokens/cosmic_curious_analytics_token.pickle`; enables real retention data.
+  Create it once locally: `python3 -m src.analytics_auth cosmic_curious`.
+
+**Hang protection:** every Gemini request has a timeout (`GEMINI_TIMEOUT_S`, default 90),
+the scheduler kills any job after `JOB_TIMEOUT_S` (default 25 min) and retries the slot
+next tick, and the workflow serialises runs with a `concurrency` group.
+
+**Learning loop:** `src/channel_sync.py` -> `performance_snapshot.json` (hit rates, view
+ceiling, retention) -> `retention_critic` (one lesson per settled video, judged vs the
+channel median) -> `evolution_tier` (data-driven directive injected into the topic agent).
+
+**Tests:** `python3 -m pytest tests/`
+
+**Secrets hygiene:** never zip/share `.env`, `client_secret.json`, `tokens/` or `.git`.

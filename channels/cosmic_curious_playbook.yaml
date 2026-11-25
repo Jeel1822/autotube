@@ -41,13 +41,13 @@ fails:
   - "Avoid multi-layered everyday object comparisons that require complex mental math; keep the analogy direct and singular."
   - "Re-doing the same subject or title again and again (3 asteroid variants, 5 Saturn-ring videos in a week, the same dust-grain title twice): the repeats split the audience and did worse than the first."
   - "Long-form: 13 videos have earned 133 views in total (median 2). Do not publish long-form until Shorts bring an audience; every long-form slot also takes the day's #1 ranked topic."
-  - "Publishing 4+ Shorts a day: median 4-5 views and a 9-10% hit rate, vs median ~206 and 45% on days with 1-3 uploads (partly confounded with channel growth over time). Keep to 2 a day maximum."
+  - "Cadence (UNPROVEN): the old '4+ a day is worse' comparison is confounded with time. Everything before Nov 7 flopped regardless of count, and Nov 7 itself had 6 uploads and two 1,000-view Shorts. Stay at 2-3 a day until a controlled test says otherwise."
 generation_mix:
   - "Of the 30 candidates, at least 10 must open as a first-person scene ('What it feels like to...', 'I tried walking on...', 'My experience on...') on a real, named object."
   - "At least 6 must hinge on an everyday object or sensation (a compass, glass, rain, diamonds, sound, a rocket, your body)."
   - "At least 4 must be a hidden / secret / missing-object idea (a second Earth, a temporary moon, a galaxy missing its stars)."
   - "Keep each topic to 8 words or fewer."
-  - "Every candidate MUST be framed as an active, first-person scene or sensory action (e.g., 'Standing on...', 'Floating above...', 'Falling through...')."
+  - "Aim for about half first-person scenes and half plain concrete claims about a familiar object in an alien place ('Moon dust smells like a gunshot', 'Why pencils float on Venus'). Both styles produced 1,000-view Shorts; do not force every topic into first person."
 
 # ---- Deterministic filter (src/agents/content_filter.py) -------------------
 filter:

@@ -18,6 +18,7 @@ import re
 from datetime import datetime, timezone
 from pathlib import Path
 
+from src.gemini_client import gemini_http_options
 import yaml
 
 from src.trend_scout import get_trending_topic
@@ -272,7 +273,7 @@ def _generate_more_topics(
         return []
 
     try:
-        client = genai_client.Client(
+        client = genai_client.Client(http_options=gemini_http_options(), 
             api_key=os.environ["GEMINI_API_KEY"]
         )
 
@@ -518,7 +519,7 @@ def generate_with_gemini(
     language: str,
 ) -> dict:
 
-    client = genai_client.Client(
+    client = genai_client.Client(http_options=gemini_http_options(), 
         api_key=os.environ["GEMINI_API_KEY"]
     )
 
@@ -913,7 +914,7 @@ def _generate_more_kids_topics(
 
     try:
 
-        client = genai_client.Client(
+        client = genai_client.Client(http_options=gemini_http_options(), 
             api_key=os.environ["GEMINI_API_KEY"]
         )
 
@@ -1093,7 +1094,7 @@ def generate_kids_script_with_gemini(
     language: str,
 ) -> dict:
 
-    client = genai_client.Client(
+    client = genai_client.Client(http_options=gemini_http_options(), 
         api_key=os.environ["GEMINI_API_KEY"]
     )
 

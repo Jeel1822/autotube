@@ -41,6 +41,10 @@ use_hashtag_agent: true
 # explanatory ones a touch slower) instead of one flat rate for the
 # whole script. Falls back to standard single-rate TTS on any failure.
 use_varied_pacing: true
+# Retention gate (EXPERIMENT E2, see CHANGELOG_EXPERIMENTS.md; off until the E1 week is measured): deterministic
+# hook / density / loop-ending checks on every Short script, repaired through
+# the normal quality-gate loop.
+use_retention_gate: false  # flip to true on 2026-12-02 (one change per week)
 trend_subreddit: "space"
 upload_time_utc: "13:30" # long-form upload time
 longform_interval_days: 2 # every other day, not daily (only used when longform_enabled)
@@ -67,7 +71,7 @@ category_id: "27" # YouTube category: Education
 # Advanced settings). If blank it is auto-detected from the video registry.
 youtube_channel_id: "UCsQNDNHnE3RhgKB2T9Bol_Q"
 sync_max_age_days: 0.5        # re-sync real stats / refresh the playbook every 12 hours
-playbook_hit_views: 2500     # a Short "hits" at this many views
+playbook_hit_views: 250      # a Short "hits" at this many views (was 2500: nothing ever reached it, so every hit-rate was 0% and every video was labelled UNDERPERFORMER)
 short_max_seconds: 75       # anything longer counts as long-form in stats
 # Extra YouTube searches for outlier-ranked trends (100 quota units each;
 # the free daily quota is 10,000). The niche string above is always searched.

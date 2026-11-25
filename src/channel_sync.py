@@ -319,6 +319,15 @@ def compute_snapshot(videos: list, playbook: dict, config: dict) -> dict:
     recent_titles = [clean_title(v["title"]) for v in shorts_all[:30]][::-1]
 
     long_views = views_of(long_all)
+    all_short_views = sorted((v["views"] for v in shorts), reverse=True)
+    top = all_short_views[0] if all_short_views else 0
+    # A cluster of videos stopping at the same view count (e.g. ~1,000) means
+    # the audience-test ceiling, not topic quality, is the limiting factor.
+    view_ceiling = {
+        "max": top,
+        "n_within_5pct_of_max": sum(1 for x in all_short_views if top and x >= top * 0.95),
+        "n_between_90pct_and_max": sum(1 for x in all_short_views if top and x >= top * 0.90),
+    }
     return {
         "generated_at": now.isoformat(),
         "hit_views": hit,
@@ -327,6 +336,7 @@ def compute_snapshot(videos: list, playbook: dict, config: dict) -> dict:
         "baseline": baseline,
         "pattern_stats": pattern_stats,
         "cadence": cadence,
+        "view_ceiling": view_ceiling,
         "long_form": {"n": len(long_all), "total_views": sum(long_views),
                       "median": statistics.median(long_views) if long_views else None},
         "rule_warnings": warnings,
@@ -339,6 +349,45 @@ def compute_snapshot(videos: list, playbook: dict, config: dict) -> dict:
 # --------------------------------------------------------------------------
 # Entry points
 # --------------------------------------------------------------------------
+
+def _attach_retention(snap: dict, channel_id: str, videos: list, short_max: int) -> dict:
+    """Adds REAL retention (avg view %, avg seconds watched, subs gained) to the
+    snapshot using the Analytics API. Needs tokens/<channel>_analytics_token.pickle
+    (CI: secret YOUTUBE_ANALYTICS_TOKEN_<CHANNEL>). Silently returns the snapshot
+    unchanged if no token / API failure -- views-only learning still works."""
+    token = ROOT / "tokens" / f"{channel_id}_analytics_token.pickle"
+    if not token.exists():
+        print("Channel sync: no analytics token; learning from views only "
+              "(no retention data).")
+        return snap
+    try:
+        from src.analytics_auth import get_analytics_service
+        from src.channel_analytics import fetch_video_performance
+        svc = get_analytics_service(str(token), None)
+        ids = [v["video_id"] for v in videos if v["duration_s"] <= short_max]
+        perf = fetch_video_performance(svc, ids)
+    except Exception as e:
+        print(f"WARNING: retention fetch failed ({e}); using views only.")
+        return snap
+    if not perf:
+        return snap
+    snap["retention_by_id"] = perf
+    cutoff = 25.0  # % of the video watched on average; ~top of your range
+    hi = [snap["views_by_id"].get(i, 0) for i, p in perf.items()
+          if (p.get("avg_view_pct") or 0) >= cutoff]
+    lo = [snap["views_by_id"].get(i, 0) for i, p in perf.items()
+          if (p.get("avg_view_pct") or 0) < cutoff]
+    pcts = [p.get("avg_view_pct") or 0 for p in perf.values()]
+    snap["retention_summary"] = {
+        "n": len(perf),
+        "median_avg_view_pct": round(statistics.median(pcts), 1),
+        "high_retention_cutoff_pct": cutoff,
+        "n_high": len(hi), "median_views_high": statistics.median(hi) if hi else None,
+        "n_low": len(lo), "median_views_low": statistics.median(lo) if lo else None,
+        "subs_gained_total": sum(p.get("subscribers_gained") or 0 for p in perf.values()),
+    }
+    return snap
+
 
 def sync_channel(channel_id: str, config: dict, playbook: dict = None):
     """Fetch, backfill and write the snapshot. Returns the snapshot or None."""
@@ -361,21 +410,24 @@ def sync_channel(channel_id: str, config: dict, playbook: dict = None):
         added = backfill_registry(channel_id, videos, short_max)
         snap = compute_snapshot(videos, playbook, config)
         snap["youtube_channel_id"] = yt_id
+        snap = _attach_retention(snap, channel_id, videos, short_max)
         _write_json(_state(channel_id, "performance_snapshot.json"), snap)
 
-        # Run retention_critic post-mortem on recent videos if we have snapshot data
-        if snap and snap.get("views_by_id"):
-            try:
-                from src.agents.retention_critic import run_post_mortem
-                views_map = snap["views_by_id"]
-                hit_thresh = snap.get("hit_views", 250)
-                # Pick the 3 most recent videos to audit
-                for v in videos[:3]:
-                    vid = v["video_id"]
-                    if vid in views_map:
-                        run_post_mortem(channel_id, vid, v["title"], views_map[vid], hit_thresh)
-            except Exception as e:
-                print(f"WARNING: retention_critic post-mortem failed ({e}).")
+        # Post-mortems: only videos old enough to have settled, each audited
+        # ONCE (this used to re-audit the 3 newest videos every sync, flooding
+        # memory with duplicate lessons), judged against the channel's own
+        # median instead of an absolute bar nothing could reach.
+        try:
+            from src.agents.retention_critic import audit_recent_videos
+            audit_recent_videos(channel_id, videos, snap, MIN_AGE_DAYS)
+        except Exception as e:
+            print(f"WARNING: retention_critic post-mortem failed ({e}).")
+        # Turn the measured numbers into the topic agent's strategic directive.
+        try:
+            from src.agents.evolution_tier import evolve_strategy
+            evolve_strategy(channel_id)
+        except Exception as e:
+            print(f"WARNING: evolution tier failed ({e}).")
         for w in snap["rule_warnings"]:
             print(f"  WARNING: {w}")
         return snap
