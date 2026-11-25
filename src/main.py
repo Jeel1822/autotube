@@ -12,6 +12,7 @@ This is what the GitHub Actions workflow calls, once per video, on a schedule.
 from dotenv import load_dotenv
 load_dotenv()
 import argparse
+import os
 import random
 import re
 import sys
@@ -149,6 +150,12 @@ def run(channel_id: str, is_short: bool, privacy_status: str = "public",
         dry_run: bool = False, language_override: str = None) -> None:
     config = load_channel_config(channel_id)
     is_kids_channel = config.get("visual_style") == "puppet_animation"
+    if (not is_short and config.get("longform_enabled", True) is False
+            and not os.environ.get("FORCE_LONGFORM")):
+        print(f"Long-form is paused for {channel_id} (longform_enabled: false). "
+              f"Skipping so it doesn't burn the day's #1 topic and Gemini quota. "
+              f"Set FORCE_LONGFORM=1 to override.")
+        return
     print(f"=== Running {config['display_name']} | {'SHORT' if is_short else 'LONG-FORM'} | Lang: {language_override or 'auto'} ===")
 
     # Pre-flight auth check -- fails fast (~1 second) if the YouTube

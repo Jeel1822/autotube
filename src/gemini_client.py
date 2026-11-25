@@ -10,7 +10,7 @@ from google import genai
 from google.genai import types
 
 
-GEMINI_MODEL = "gemini-flash-lite-latest"
+GEMINI_MODEL = "gemini-3.5-flash-lite"
 
 
 # Per-request HTTP timeout. WITHOUT this the SDK waits forever on a stalled
@@ -37,7 +37,7 @@ def get_client():
 # Fallback models tried if the primary stays overloaded (comma-separated env override).
 FALLBACK_MODELS = [
     m.strip()
-    for m in os.environ.get("GEMINI_FALLBACK_MODELS", "gemini-flash-lite-latest,gemini-flash-latest,gemini-3.5-flash-lite,gemini-3.5-flash").split(",")
+    for m in os.environ.get("GEMINI_FALLBACK_MODELS", "gemini-3.5-flash-lite,gemini-3.5-flash,gemini-3.8-flash").split(",")
     if m.strip()
 ]
 
@@ -69,48 +69,70 @@ def _is_model_gone(exc: Exception) -> bool:
     return any(m in blob for m in _GONE)
 
 
+_QUOTA = ("429", "resource_exhausted", "quota")
+
+
+def _is_quota(exc: Exception) -> bool:
+    blob = " ".join(str(x).lower() for x in (
+        exc, getattr(exc, "code", ""), getattr(exc, "status_code", ""),
+        getattr(exc, "status", "")))
+    return any(m in blob for m in _QUOTA)
+
+
 def send_with_retry(prompt, model: str = GEMINI_MODEL, config=None,
                     attempts_per_model: int = 4):
-    """Send a prompt, retrying transient errors (503/429/...) briefly per
-    model, then falling back to FALLBACK_MODELS. A model that exhausts its
-    retries is skipped for 2 minutes. Non-transient errors raise immediately."""
+    """Send a prompt. 503/overloaded -> short backoff retries on the same model.
+    429/quota -> retrying the same model is pointless (it is a quota, not a blip),
+    so move straight to the next model (quotas are per model). Retired models (404)
+    are skipped. If every model fails, one more pass after a pause, then raise the
+    most informative error (a real 503/429, never a 404 from a dead model).
+    Each request also has an HTTP timeout (see gemini_http_options)."""
     client = get_client()
     all_models = [model] + [m for m in FALLBACK_MODELS if m != model]
     random.shuffle(all_models)
-    now = time.monotonic()
-    models = [m for m in all_models if _DOWN_UNTIL.get(m, 0) <= now] or all_models
-    last_exc = None
+    real_exc = None  # last non-404 error: the one worth raising
 
-    for mi, mdl in enumerate(models):
-        for attempt in range(attempts_per_model):
-            try:
-                chat = client.chats.create(model=mdl)
-                if config is not None:
-                    return chat.send_message(prompt, config=config)
-                return chat.send_message(prompt)
-            except Exception as exc:
-                last_exc = exc
-                if _is_model_gone(exc) and mi < len(models) - 1:
-                    # Retired / unavailable model: don't retry, move to next one.
-                    print(f"Gemini model {mdl} is not available "
-                          f"({str(exc)[:80]}); trying {models[mi + 1]}.", flush=True)
-                    _DOWN_UNTIL[mdl] = time.monotonic() + 3600
-                    break
-                if not _is_transient(exc):
-                    raise
-                if attempt == attempts_per_model - 1:
-                    break
-                delay = 3 * 2 ** attempt + random.uniform(0, 1)
-                print(f"Gemini transient error on {mdl}: {str(exc)[:80]}. "
-                      f"Retrying in {delay:.0f}s...", flush=True)
-                time.sleep(delay)
-        if _DOWN_UNTIL.get(mdl, 0) <= time.monotonic():
-            _DOWN_UNTIL[mdl] = time.monotonic() + _COOLDOWN_SECONDS
-        if mi < len(models) - 1 and not _is_model_gone(last_exc):
-            print(f"Gemini {mdl} unavailable; switching to {models[mi + 1]} "
-                  f"(skipping {mdl} for {_COOLDOWN_SECONDS // 60} min).", flush=True)
+    for pass_no in range(2):
+        now = time.monotonic()
+        models = [m for m in all_models if _DOWN_UNTIL.get(m, 0) <= now] or all_models
+        quota_seen = False
+        for mi, mdl in enumerate(models):
+            for attempt in range(attempts_per_model):
+                try:
+                    chat = client.chats.create(model=mdl)
+                    if config is not None:
+                        return chat.send_message(prompt, config=config)
+                    return chat.send_message(prompt)
+                except Exception as exc:
+                    if _is_model_gone(exc):
+                        print(f"Gemini model {mdl} is not available "
+                              f"({str(exc)[:80]}); skipping it.", flush=True)
+                        _DOWN_UNTIL[mdl] = time.monotonic() + 3600
+                        break
+                    real_exc = exc
+                    if not _is_transient(exc):
+                        raise
+                    if _is_quota(exc):
+                        quota_seen = True
+                        print(f"Gemini quota hit on {mdl}; switching model "
+                              f"(no point retrying it).", flush=True)
+                        break
+                    if attempt == attempts_per_model - 1:
+                        break
+                    delay = 3 * 2 ** attempt + random.uniform(0, 1)
+                    print(f"Gemini transient error on {mdl}: {str(exc)[:80]}. "
+                          f"Retrying in {delay:.0f}s...", flush=True)
+                    time.sleep(delay)
+            if _DOWN_UNTIL.get(mdl, 0) <= time.monotonic():
+                _DOWN_UNTIL[mdl] = time.monotonic() + _COOLDOWN_SECONDS
+        if pass_no == 0 and real_exc is not None:
+            wait = 30 if quota_seen else 10
+            print(f"All Gemini models failed; pausing {wait}s then one more pass.",
+                  flush=True)
+            time.sleep(wait)
+            _DOWN_UNTIL.clear()
 
-    raise last_exc
+    raise real_exc or RuntimeError("No Gemini model available.")
 
 
 def generate(
